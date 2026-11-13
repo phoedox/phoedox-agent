@@ -4,7 +4,7 @@ Danke, dass du Phoedox verbessern willst! Phoedox besteht aus mehreren Repositor
 [phoedox](https://github.com/phoedox/phoedox) (Server + Web), [phoedox-sdk](https://github.com/phoedox/phoedox-sdk),
 [phoedox-plugins](https://github.com/phoedox/phoedox-plugins), [phoedox-agent](https://github.com/phoedox/phoedox-agent),
 [phoedox-store](https://github.com/phoedox/phoedox-store) und [phoedox-app](https://github.com/phoedox/phoedox-app).
-Die grundlegenden Entscheidungen stehen in [`phoedox/docs/decisions.md`](https://github.com/phoedox/phoedox/blob/main/docs/decisions.md).
+Die grundlegenden Entscheidungen werden in Phoedox selbst geführt (Projekt `phoedox`, öffentlich ab `docs.phoedox.com`); bis dahin gilt der Stand im Git-Verlauf von [`phoedox/docs/decisions.md`](https://github.com/phoedox/phoedox/blob/main/docs/decisions.md). Neue Grundsatzentscheidungen bitte im Pull Request beschreiben – sie werden als ADR übernommen.
 
 ## Verhalten
 

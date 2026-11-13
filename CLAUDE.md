@@ -1,6 +1,6 @@
 # phoedox-agent
 
-Agent für Server/VMs/LXC. Gesamtentscheidungen: `phoedox/phoedox` → `docs/decisions.md` (Abschnitt Agent).
+Agent für Server/VMs/LXC. Gesamtentscheidungen: in Phoedox (https://app.phoedox.com, Projekt `phoedox`), v. a. ADR-0004; per MCP lesen, neue mit `create_decision` anlegen.
 
 ## Aufbau
 
