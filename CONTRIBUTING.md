@@ -6,6 +6,10 @@ Danke, dass du Phoedox verbessern willst! Phoedox besteht aus mehreren Repositor
 [phoedox-store](https://github.com/phoedox/phoedox-store) und [phoedox-app](https://github.com/phoedox/phoedox-app).
 Die grundlegenden Entscheidungen stehen in [`phoedox/docs/decisions.md`](https://github.com/phoedox/phoedox/blob/main/docs/decisions.md).
 
+## Verhalten
+
+Es gilt unser [Code of Conduct](CODE_OF_CONDUCT.md). Verstöße bitte an admin@coph.dev melden.
+
 ## Bevor du loslegst
 
 - Für größere Änderungen bitte zuerst ein Issue öffnen und den Ansatz abstimmen.
@@ -18,13 +22,10 @@ Die grundlegenden Entscheidungen stehen in [`phoedox/docs/decisions.md`](https:/
 3. Commits nach [Conventional Commits](https://www.conventionalcommits.org/de/) (`feat:`, `fix:`, `docs:` …) – daraus entstehen Versionen und Changelog.
 4. Pull Request mit ausgefüllter Vorlage.
 
-## Contributor License Agreement (CLA)
+## Lizenz deiner Beiträge
 
-Für Beiträge zu Phoedox ist ein CLA nötig. Damit räumst du dem Projekt die Rechte ein, deinen Beitrag
-auch unter anderen Lizenzen anzubieten (z. B. für eine Enterprise-Lizenz neben der AGPL). Du behältst dein Urheberrecht.
-Beim ersten Pull Request fordert dich der CLA-Bot zur Zustimmung auf.
-
-> Der CLA-Text wird gerade rechtlich geprüft. Bis dahin können Pull Requests nicht gemergt werden.
+Dieses Repository steht unter MIT. Mit einem Pull Request stellst du deinen Beitrag unter dieselbe Lizenz.
+Ein CLA ist hier nicht nötig.
 
 ## Stil
 
