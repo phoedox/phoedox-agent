@@ -1,0 +1,16 @@
+version: 2
+builds:
+  - main: ./cmd/phoedox-agent
+    env: [CGO_ENABLED=0]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+    goos: [linux, windows, darwin, freebsd]
+    goarch: [amd64, arm64]
+    ignore:
+      - { goos: windows, goarch: arm64 }
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - { goos: windows, formats: [zip] }
+checksum:
+  name_template: checksums.txt
+# Signing of binaries and checksums (for self-update) is added with the release key.

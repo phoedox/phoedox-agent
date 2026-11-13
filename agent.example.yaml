@@ -1,0 +1,18 @@
+# phoedox-agent configuration (/etc/phoedox-agent/agent.yaml)
+instance: https://app.phoedox.com
+# Filled in by `phoedox-agent enroll`:
+agentId: ""
+# Actions this host allows. "read" is always allowed.
+# Options: container.restart, container.update, stack.redeploy, system.update, exec
+allow:
+  - container.restart
+# Glob patterns for exec (only if "exec" is allowed above)
+execCommands: []
+# Admin public keys (base64 ed25519) whose signed jobs are accepted
+adminKeys: []
+# Mode: host | proxmox-host | docker
+mode: host
+# Network discovery (ARP, mDNS, SNMP, LLDP); organisations can force this off
+discovery: false
+# Self-update: auto (signed, version approved by admin) | notify
+update: auto
