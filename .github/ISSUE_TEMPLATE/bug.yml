@@ -1,0 +1,25 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: Was ist passiert?, description: Und was hättest du erwartet? }
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes: { label: Schritte zum Nachstellen }
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes: { label: Version, placeholder: z. B. 1.4.2 }
+    validations: { required: true }
+  - type: dropdown
+    id: hosting
+    attributes:
+      label: Betrieb
+      options: [Phoedox Cloud, Docker, Home-Assistant-Add-on, Binary, Andere]
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes: { label: Logs, description: Ohne Geheimnisse oder personenbezogene Daten, render: text }

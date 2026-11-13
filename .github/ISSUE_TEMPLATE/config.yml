@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/phoedox/phoedox/security/advisories/new
+    about: Bitte vertraulich melden, nicht als Issue.

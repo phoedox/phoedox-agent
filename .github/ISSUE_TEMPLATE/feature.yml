@@ -1,0 +1,16 @@
+name: Idee vorschlagen
+description: Neue Funktion oder Verbesserung
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes: { label: Welches Problem löst es?, description: Beschreibe die Situation, nicht nur die Lösung. }
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes: { label: Vorschlag }
+  - type: dropdown
+    id: where
+    attributes:
+      label: Kern oder Plugin?
+      options: [Kern, Plugin, Weiß nicht]
