@@ -3,6 +3,7 @@
 package collect
 
 import (
+	"net"
 	"os"
 	"runtime"
 	"time"
@@ -10,17 +11,30 @@ import (
 
 // Snapshot is the read-only state of one host.
 type Snapshot struct {
-	Hostname  string    `json:"hostname"`
-	OS        string    `json:"os"`
-	Arch      string    `json:"arch"`
-	CPUs      int       `json:"cpus"`
-	Kernel    string    `json:"kernel,omitempty"`
-	Distro    string    `json:"distro,omitempty"`
-	UptimeSec int64     `json:"uptimeSec,omitempty"`
-	MemTotal  uint64    `json:"memTotalBytes,omitempty"`
-	MemAvail  uint64    `json:"memAvailableBytes,omitempty"`
-	Disks     []Disk    `json:"disks,omitempty"`
-	TakenAt   time.Time `json:"takenAt"`
+	Hostname  string `json:"hostname"`
+	OS        string `json:"os"`
+	Arch      string `json:"arch"`
+	CPUs      int    `json:"cpus"`
+	Kernel    string `json:"kernel,omitempty"`
+	Distro    string `json:"distro,omitempty"`
+	UptimeSec int64  `json:"uptimeSec,omitempty"`
+	MemTotal  uint64 `json:"memTotalBytes,omitempty"`
+	MemAvail  uint64 `json:"memAvailableBytes,omitempty"`
+	Disks     []Disk `json:"disks,omitempty"`
+	// Virt is "vm", "lxc", "container" or empty for bare metal / unknown.
+	Virt       string      `json:"virt,omitempty"`
+	IPs        []string    `json:"ips,omitempty"`
+	Containers []Container `json:"containers,omitempty"`
+	Version    string      `json:"agentVersion,omitempty"`
+	TakenAt    time.Time   `json:"takenAt"`
+}
+
+// Container is a Docker container on the host.
+type Container struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
+	State string `json:"state"`
+	Ports string `json:"ports,omitempty"`
 }
 
 // Disk is the usage of one mount point.
@@ -35,6 +49,35 @@ type Disk struct {
 func Take() Snapshot {
 	h, _ := os.Hostname()
 	s := Snapshot{Hostname: h, OS: runtime.GOOS, Arch: runtime.GOARCH, CPUs: runtime.NumCPU(), TakenAt: time.Now().UTC()}
+	s.IPs = addresses()
 	platform(&s)
 	return s
+}
+
+// addresses returns the global unicast addresses of the up interfaces,
+// IPv4 first.
+func addresses() []string {
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var v4, v6 []string
+	for _, i := range ifs {
+		if i.Flags&net.FlagUp == 0 || i.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, _ := i.Addrs()
+		for _, a := range addrs {
+			n, ok := a.(*net.IPNet)
+			if !ok || !n.IP.IsGlobalUnicast() {
+				continue
+			}
+			if n.IP.To4() != nil {
+				v4 = append(v4, n.IP.String())
+			} else {
+				v6 = append(v6, n.IP.String())
+			}
+		}
+	}
+	return append(v4, v6...)
 }

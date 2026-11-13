@@ -23,6 +23,7 @@ func platform(s *Snapshot) {
 		}
 	}
 	s.MemTotal, s.MemAvail = meminfo("/proc/meminfo")
+	s.Virt = virt("/")
 	var st syscall.Statfs_t
 	if syscall.Statfs("/", &st) == nil {
 		s.Disks = append(s.Disks, Disk{Mount: "/", Total: st.Blocks * uint64(st.Bsize), Free: st.Bavail * uint64(st.Bsize)})
@@ -70,4 +71,35 @@ func meminfo(path string) (total, avail uint64) {
 		}
 	}
 	return total, avail
+}
+
+// virt detects whether the host is a VM, an LXC or another container.
+// root is "/" except in tests.
+func virt(root string) string {
+	read := func(p string) string {
+		b, _ := os.ReadFile(root + p)
+		return strings.TrimSpace(string(b))
+	}
+	if c := read("run/systemd/container"); c != "" {
+		if c == "lxc" || c == "lxc-libvirt" {
+			return "lxc"
+		}
+		return "container"
+	}
+	if env := read("proc/1/environ"); strings.Contains(env, "container=lxc") {
+		return "lxc"
+	}
+	if _, err := os.Stat(root + ".dockerenv"); err == nil {
+		return "container"
+	}
+	dmi := strings.ToLower(read("sys/class/dmi/id/sys_vendor") + " " + read("sys/class/dmi/id/product_name"))
+	for _, v := range []string{"qemu", "kvm", "vmware", "virtualbox", "microsoft corporation virtual", "xen", "bochs", "parallels", "proxmox"} {
+		if strings.Contains(dmi, v) {
+			return "vm"
+		}
+	}
+	if strings.Contains(read("proc/cpuinfo"), " hypervisor") {
+		return "vm"
+	}
+	return ""
 }

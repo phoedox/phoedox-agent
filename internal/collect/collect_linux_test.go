@@ -31,3 +31,30 @@ func TestTake(t *testing.T) {
 		t.Fatalf("unexpected snapshot %+v", s)
 	}
 }
+
+func TestVirt(t *testing.T) {
+	mk := func(files map[string]string) string {
+		root := t.TempDir() + "/"
+		for p, c := range files {
+			os.MkdirAll(filepath.Dir(root+p), 0o755)
+			os.WriteFile(root+p, []byte(c), 0o644)
+		}
+		return root
+	}
+	cases := []struct {
+		files map[string]string
+		want  string
+	}{
+		{map[string]string{"run/systemd/container": "lxc\n"}, "lxc"},
+		{map[string]string{"proc/1/environ": "PATH=/bin\x00container=lxc\x00"}, "lxc"},
+		{map[string]string{".dockerenv": ""}, "container"},
+		{map[string]string{"sys/class/dmi/id/sys_vendor": "QEMU", "sys/class/dmi/id/product_name": "Standard PC (Q35 + ICH9, 2009)"}, "vm"},
+		{map[string]string{"proc/cpuinfo": "flags : fpu vme hypervisor lahf_lm"}, "vm"},
+		{map[string]string{"sys/class/dmi/id/sys_vendor": "Dell Inc."}, ""},
+	}
+	for _, c := range cases {
+		if got := virt(mk(c.files)); got != c.want {
+			t.Errorf("%v: got %q, want %q", c.files, got, c.want)
+		}
+	}
+}

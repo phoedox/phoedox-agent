@@ -1,0 +1,19 @@
+[Unit]
+Description=Phoedox agent (read-only host reports)
+Documentation=https://github.com/phoedox/phoedox-agent
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/phoedox-agent run
+Restart=always
+RestartSec=30
+# Reads /proc, /sys and the Docker socket; writes nothing but its log.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/phoedox-agent
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

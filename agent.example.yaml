@@ -1,7 +1,6 @@
 # phoedox-agent configuration (/etc/phoedox-agent/agent.yaml)
-instance: https://app.phoedox.com
-# Filled in by `phoedox-agent enroll`:
-agentId: ""
+# Stage 2 (actions). Instance, agent ID and token come from
+# `phoedox-agent enroll` and live in credentials.json next to this file.
 # Actions this host allows. "read" is always allowed.
 # Options: container.restart, container.update, stack.redeploy, system.update, exec
 allow:
