@@ -11,6 +11,7 @@ Agent für Server/VMs/LXC. Gesamtentscheidungen: `phoedox/phoedox` → `docs/dec
 
 ## Regeln
 
+- Immer die aktuelle stabile Go-Version und aktuelle Abhängigkeiten verwenden (`go` + `toolchain` in `go.mod`).
 - **Sicherheit vor Komfort:** Keine Aktion ohne `policy.Check`. Neue Aktionen bekommen eine Konstante in `policy` und Tests für erlaubt/verboten/abgelaufen/manipuliert.
 - Keine eingehenden Ports. Nur ausgehende Verbindungen zur konfigurierten Instanz.
 - Muss für linux/amd64, linux/arm64, windows/amd64, darwin/*, freebsd/amd64 bauen (CI prüft das). Kein CGO.
