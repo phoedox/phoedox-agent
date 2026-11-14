@@ -140,3 +140,19 @@ func TestAgentUpdate(t *testing.T) {
 		t.Fatalf("old binary kept: %q", b)
 	}
 }
+
+func TestHACall(t *testing.T) {
+	r := &Runner{}
+	j := policy.Job{ID: "h", Action: policy.ActHACall, Args: []string{"switch.flur", "turn_on"}}
+	if res := r.Run(context.Background(), j); res.OK || !strings.Contains(res.Output, "no Home Assistant") {
+		t.Fatalf("without HA: %+v", res)
+	}
+	var got []string
+	r.HACall = func(_ context.Context, entity, service string) (string, error) {
+		got = []string{entity, service}
+		return entity + " is on", nil
+	}
+	if res := r.Run(context.Background(), j); !res.OK || res.Output != "switch.flur is on" || got[1] != "turn_on" {
+		t.Fatalf("call: %+v %v", res, got)
+	}
+}

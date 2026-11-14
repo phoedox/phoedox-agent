@@ -50,6 +50,9 @@ type Runner struct {
 	// action is not available. It blocks for up to an hour, so the caller
 	// runs terminal jobs in their own goroutine.
 	Terminal func(ctx context.Context, sessionID string) (string, error)
+	// HACall switches a Home Assistant entity (entity, service); nil means
+	// no Home Assistant is configured.
+	HACall func(ctx context.Context, entity, service string) (string, error)
 }
 
 // New returns a runner that uses the real system.
@@ -164,6 +167,14 @@ func (r *Runner) run(ctx context.Context, j policy.Job) (string, error) {
 			return "", errors.New("terminal is not available")
 		}
 		return r.Terminal(ctx, j.Args[0])
+	case policy.ActHACall:
+		if r.HACall == nil {
+			return "", errors.New("no Home Assistant configured (homeassistant in agent.yaml)")
+		}
+		if len(j.Args) != 2 {
+			return "", errors.New("ha.call needs an entity and a service")
+		}
+		return r.HACall(ctx, j.Args[0], j.Args[1])
 	case policy.ActExec:
 		if len(j.Args) == 0 || !filepath.IsAbs(j.Args[0]) {
 			return "", errors.New("exec needs an absolute command path")

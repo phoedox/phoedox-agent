@@ -128,3 +128,49 @@ func TestNewActionsPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestHomeAssistantPolicy(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	keys := []string{base64.StdEncoding.EncodeToString(pub)}
+	ha := HomeAssistant{URL: "http://ha.local:8123", TokenFile: "/etc/phoedox-agent/ha-token", Entities: []string{"switch.*", "light.flur"}}
+	cfg := Config{Allow: []string{ActHACall}, AdminKeys: keys, HomeAssistant: ha}
+	sign := func(args ...string) SignedJob {
+		sj, _ := Sign(Job{ID: "h1", Agent: "pi", Action: ActHACall, Args: args, Expires: now.Add(5 * time.Minute)}, priv)
+		return sj
+	}
+	ok := sign("switch.flur", "turn_off")
+	if err := cfg.Check("pi", ok, now); err != nil {
+		t.Fatalf("allowed: %v", err)
+	}
+	if err := cfg.Check("pi", sign("light.flur", "toggle"), now); err != nil {
+		t.Fatalf("allowed light: %v", err)
+	}
+	for name, sj := range map[string]SignedJob{
+		"entity not listed": sign("light.kitchen", "turn_on"),
+		"sensor":            sign("sensor.temp", "turn_on"),
+		"unknown service":   sign("switch.flur", "reload"),
+		"missing service":   sign("switch.flur"),
+		"glob in entity":    sign("switch.*", "turn_on"),
+	} {
+		if err := cfg.Check("pi", sj, now); !errors.Is(err, ErrNotAllowed) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	noHA := cfg
+	noHA.HomeAssistant = HomeAssistant{Entities: []string{"switch.*"}}
+	if err := noHA.Check("pi", ok, now); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("without homeassistant: %v", err)
+	}
+	if err := (Config{AdminKeys: keys, HomeAssistant: ha}).Check("pi", ok, now); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("not in allow list: %v", err)
+	}
+	if err := cfg.Check("pi", ok, now.Add(5*time.Minute)); !errors.Is(err, ErrExpired) {
+		t.Fatalf("expired: %v", err)
+	}
+	tampered := ok
+	tampered.Job.Args = []string{"switch.heizung", "turn_off"}
+	if err := cfg.Check("pi", tampered, now); !errors.Is(err, ErrSignature) {
+		t.Fatalf("tampered: %v", err)
+	}
+}

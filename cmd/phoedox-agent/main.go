@@ -23,6 +23,7 @@ import (
 	"github.com/phoedox/phoedox-agent/internal/collect"
 	"github.com/phoedox/phoedox-agent/internal/config"
 	"github.com/phoedox/phoedox-agent/internal/docker"
+	"github.com/phoedox/phoedox-agent/internal/homeassistant"
 	"github.com/phoedox/phoedox-agent/internal/jobs"
 	"github.com/phoedox/phoedox-agent/internal/policy"
 	"github.com/phoedox/phoedox-agent/internal/speedtest"
@@ -80,10 +81,16 @@ func main() {
 	}
 }
 
-// snapshot reads the host; Docker is optional.
+// ha is the Home Assistant in this network, if agent.yaml names one.
+var ha *homeassistant.Client
+
+// snapshot reads the host; Docker and Home Assistant are optional.
 func snapshot(ctx context.Context) collect.Snapshot {
 	s := collect.Take()
 	s.Version = version
+	if ha != nil {
+		s.HomeAssistant = ha.Read(ctx, time.Now())
+	}
 	if cs, err := docker.Containers(ctx, docker.Socket()); err == nil {
 		s.Containers = cs
 		s.DockerVersion, _ = docker.Version(ctx, docker.Socket())
@@ -139,6 +146,10 @@ func run(ctx context.Context, args []string) error {
 	cfg, err := config.Load(state.Dir())
 	if err != nil {
 		return err
+	}
+	if cfg.HomeAssistant.Enabled() {
+		ha = &homeassistant.Client{URL: cfg.HomeAssistant.URL, TokenFile: cfg.HomeAssistant.TokenFile}
+		log.Printf("reading Home Assistant at %s", cfg.HomeAssistant.URL)
 	}
 	log.Printf("reporting to %s (project %s) every %s", st.Instance, st.Project, *interval)
 	if len(cfg.Allow) > 0 && len(cfg.AdminKeys) > 0 {
@@ -232,6 +243,9 @@ func jobLoop(ctx context.Context, c *client.Client, st state.State, cfg policy.C
 	runner.Terminal = func(ctx context.Context, id string) (string, error) {
 		return terminal.Run(ctx, terminal.Options{Base: st.Instance, Token: st.Token, UserAgent: c.UserAgent,
 			SessionID: id, Shell: cfg.TerminalShell})
+	}
+	if ha != nil {
+		runner.HACall = ha.Call
 	}
 	slots := make(chan struct{}, maxSessions)
 	report := func(id string, res jobs.Result) {

@@ -82,6 +82,30 @@ The agent fetches them via long poll over HTTPS; connections stay outgoing only.
   killed. At most 4 sessions run at once, beside other jobs. The agent logs only the
   start and end of a session, never its content. Linux, macOS and FreeBSD only.
 
+## Home Assistant bridge (ADR-0053)
+
+When Home Assistant is not reachable from the Phoedox instance, an agent in the
+same network can read it and switch entities. The long-lived token stays in a file
+on this host; it is never sent to the instance.
+
+```yaml
+allow: [ha.call]            # only needed for switching
+adminKeys: [...]
+homeassistant:
+  url: http://homeassistant.local:8123
+  tokenFile: /etc/phoedox-agent/ha-token   # a long-lived access token, chmod 600
+  entities: ["switch.*", "light.flur"]     # what ha.call may switch; empty = nothing
+```
+
+- Every report carries the states of the entities of devices that have an area
+  (numbers with their unit, on/off). The device list is sent when it changes and at
+  least every 6 hours. The Home Assistant plugin of the project turns it into rooms and
+  devices and records the states as history.
+- `ha.call` (args: entity, `turn_on` | `turn_off` | `toggle`) runs only for entities of
+  the domains switch, light, fan and input_boolean that match `entities`, and only as
+  a signed job like every other action.
+- Reading may fail without stopping the agent; the report then names the error.
+
 ## License
 
 MIT – see [LICENSE](LICENSE).

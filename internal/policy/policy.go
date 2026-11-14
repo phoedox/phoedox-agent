@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"regexp"
 	"time"
 )
 
@@ -34,7 +35,14 @@ const (
 	// over an outbound WebSocket to the instance; the arg is the session ID.
 	// It is the most powerful action: allow it only deliberately.
 	ActTerminal = "terminal"
+	// ActHACall switches a Home Assistant entity in the agent's network:
+	// args are the entity and the service (turn_on, turn_off, toggle). Only
+	// entities matching homeassistant.entities in agent.yaml.
+	ActHACall = "ha.call"
 )
+
+// HAServices are the services ha.call may run.
+var HAServices = []string{"turn_on", "turn_off", "toggle"}
 
 // Config is the local allowlist from agent.yaml. Read is always allowed.
 type Config struct {
@@ -46,7 +54,23 @@ type Config struct {
 	// TerminalShell is the absolute path of the shell for the terminal
 	// action; empty means /bin/bash if it exists, else /bin/sh.
 	TerminalShell string `json:"terminalShell,omitempty" yaml:"terminalShell"`
+	// HomeAssistant connects a Home Assistant in this network: the agent
+	// reads devices and states and, with ha.call allowed, switches entities.
+	HomeAssistant HomeAssistant `json:"homeassistant" yaml:"homeassistant"`
 }
+
+// HomeAssistant is the homeassistant section of agent.yaml. The token
+// stays on this host (TokenFile); it is never sent to the instance.
+type HomeAssistant struct {
+	URL       string `json:"url" yaml:"url"`
+	TokenFile string `json:"tokenFile" yaml:"tokenFile"`
+	// Entities are glob patterns of entities ha.call may switch, e.g.
+	// "switch.*" or "light.flur"; empty means none.
+	Entities []string `json:"entities" yaml:"entities"`
+}
+
+// Enabled reports whether a Home Assistant is configured.
+func (h HomeAssistant) Enabled() bool { return h.URL != "" && h.TokenFile != "" }
 
 // Job is an approved action sent by the instance.
 type Job struct {
@@ -102,6 +126,11 @@ func (c Config) Check(agentID string, sj SignedJob, now time.Time) error {
 			return fmt.Errorf("%w: command not in execCommands", ErrNotAllowed)
 		}
 	}
+	if j.Action == ActHACall {
+		if len(j.Args) != 2 || !contains(HAServices, j.Args[1]) || !c.haAllowed(j.Args[0]) {
+			return fmt.Errorf("%w: entity not in homeassistant.entities or unknown service", ErrNotAllowed)
+		}
+	}
 	return nil
 }
 
@@ -122,6 +151,20 @@ func (c Config) verify(sj SignedJob) error {
 	}
 	return ErrSignature
 }
+
+func (c Config) haAllowed(entity string) bool {
+	if !c.HomeAssistant.Enabled() || !haEntityRe.MatchString(entity) {
+		return false
+	}
+	for _, p := range c.HomeAssistant.Entities {
+		if ok, _ := path.Match(p, entity); ok {
+			return true
+		}
+	}
+	return false
+}
+
+var haEntityRe = regexp.MustCompile(`^(switch|light|fan|input_boolean)\.[a-z0-9_]+$`)
 
 func (c Config) execAllowed(cmd string) bool {
 	for _, p := range c.ExecCommands {

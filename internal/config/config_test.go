@@ -35,6 +35,18 @@ func TestLoad(t *testing.T) {
 	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "terminalShell") {
 		t.Fatalf("relative shell: %v", err)
 	}
+	write("allow: [ha.call]\nhomeassistant:\n  url: http://homeassistant.local:8123\n  tokenFile: /etc/phoedox-agent/ha-token\n  entities: [\"switch.*\"]\n")
+	if c, err := Load(dir); err != nil || !c.HomeAssistant.Enabled() || c.HomeAssistant.Entities[0] != "switch.*" {
+		t.Fatalf("homeassistant: %v %+v", err, c)
+	}
+	write("homeassistant:\n  url: homeassistant.local\n  tokenFile: /x\n")
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "homeassistant.url") {
+		t.Fatalf("bad url: %v", err)
+	}
+	write("homeassistant:\n  url: http://ha:8123\n  tokenFile: ha-token\n")
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "tokenFile") {
+		t.Fatalf("relative token file: %v", err)
+	}
 	write("adminKeys: [nope]\n")
 	if _, err := Load(dir); err == nil {
 		t.Fatal("bad key must fail")

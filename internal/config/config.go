@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -21,6 +22,7 @@ var known = map[string]bool{
 	policy.ActContainerRestart: true, policy.ActContainerUpdate: true, policy.ActStackRedeploy: true,
 	policy.ActSystemUpdate: true, policy.ActExec: true, policy.ActAgentUpdate: true,
 	policy.ActWakeOnLAN: true, policy.ActSpeedTest: true, policy.ActTerminal: true,
+	policy.ActHACall: true,
 }
 
 // Load reads dir/agent.yaml; a missing file means "read only".
@@ -49,6 +51,14 @@ func Load(dir string) (policy.Config, error) {
 	}
 	if c.TerminalShell != "" && (!filepath.IsAbs(c.TerminalShell) || filepath.Clean(c.TerminalShell) != c.TerminalShell) {
 		return c, fmt.Errorf("%s: terminalShell must be an absolute path", File)
+	}
+	if h := c.HomeAssistant; h.URL != "" || h.TokenFile != "" {
+		if u, err := url.Parse(h.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return c, fmt.Errorf("%s: homeassistant.url must be http(s)://host:port", File)
+		}
+		if !filepath.IsAbs(h.TokenFile) {
+			return c, fmt.Errorf("%s: homeassistant.tokenFile must be an absolute path", File)
+		}
 	}
 	return c, nil
 }

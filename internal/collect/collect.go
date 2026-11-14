@@ -3,6 +3,8 @@
 package collect
 
 import (
+	"github.com/phoedox/phoedox-agent/internal/homeassistant"
+
 	"net"
 	"os"
 	"runtime"
@@ -36,6 +38,9 @@ type Snapshot struct {
 	DockerVersion string    `json:"dockerVersion,omitempty"`
 	Version       string    `json:"agentVersion,omitempty"`
 	TakenAt       time.Time `json:"takenAt"`
+	// HomeAssistant is what the agent read from a Home Assistant in its
+	// network (homeassistant in agent.yaml).
+	HomeAssistant *homeassistant.Report `json:"homeassistant,omitempty"`
 }
 
 // Container is a Docker container on the host.
