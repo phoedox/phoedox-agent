@@ -1,5 +1,6 @@
-// Package docker lists containers through the local Docker API socket.
-// It only reads; a missing socket simply yields no containers.
+// Package docker talks to the local Docker API socket: it lists containers
+// and, for approved jobs only, restarts one. A missing socket yields no
+// containers.
 package docker
 
 import (
@@ -8,6 +9,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +20,14 @@ import (
 
 // DefaultSocket is where Docker listens on Linux.
 const DefaultSocket = "/var/run/docker.sock"
+
+// Socket is DOCKER_HOST when it names a unix socket (also Podman's), else DefaultSocket.
+func Socket() string {
+	if h, ok := strings.CutPrefix(os.Getenv("DOCKER_HOST"), "unix://"); ok && h != "" {
+		return h
+	}
+	return DefaultSocket
+}
 
 type apiContainer struct {
 	Names  []string          `json:"Names"`
@@ -31,12 +42,34 @@ type apiContainer struct {
 	} `json:"Ports"`
 }
 
-func get(ctx context.Context, socket, path string, out any) error {
-	c := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{
+func client(socket string, timeout time.Duration) *http.Client {
+	return &http.Client{Timeout: timeout, Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", socket)
 		},
 	}}
+}
+
+// Restart restarts a container (the only write call of this package; the
+// caller has checked the job with policy.Check).
+func Restart(ctx context.Context, socket, name string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://docker/containers/"+url.PathEscape(name)+"/restart?t=10", nil)
+	if err != nil {
+		return err
+	}
+	res, err := client(socket, 90*time.Second).Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusOK {
+		return fmt.Errorf("docker: restart %s: %s", name, res.Status)
+	}
+	return nil
+}
+
+func get(ctx context.Context, socket, path string, out any) error {
+	c := client(socket, 10*time.Second)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://docker"+path, nil)
 	if err != nil {
 		return err

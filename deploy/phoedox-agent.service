@@ -8,11 +8,14 @@ Wants=network-online.target
 ExecStart=/usr/local/bin/phoedox-agent run
 Restart=always
 RestartSec=30
-# Reads /proc, /sys and the Docker socket; writes nothing but its log.
+# Reads /proc, /sys and the Docker socket. Writes only jobs-done.json in
+# /etc/phoedox-agent (signed jobs run once). For "system.update" in agent.yaml
+# the service needs to write the system: `systemctl edit phoedox-agent` and
+# set ProtectSystem=no there.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadOnlyPaths=/etc/phoedox-agent
+ReadWritePaths=/etc/phoedox-agent
 PrivateTmp=yes
 
 [Install]

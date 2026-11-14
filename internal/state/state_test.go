@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,5 +27,20 @@ func TestSaveLoad(t *testing.T) {
 		if fi.Mode().Perm() != 0o600 {
 			t.Fatalf("mode %v", fi.Mode())
 		}
+	}
+}
+
+func TestDone(t *testing.T) {
+	dir := t.TempDir()
+	if Done(dir, "j1") {
+		t.Fatal("nothing done yet")
+	}
+	for i := range 510 {
+		if err := MarkDone(dir, fmt.Sprint("j", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !Done(dir, "j509") || Done(dir, "j0") {
+		t.Fatal("keeps the newest 500")
 	}
 }

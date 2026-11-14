@@ -14,6 +14,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/phoedox/phoedox-agent/internal/policy"
 )
 
 // ErrRevoked means the instance no longer accepts the token.
@@ -43,15 +45,25 @@ func Normalize(raw string) (string, error) {
 }
 
 func (c *Client) post(ctx context.Context, path string, in, out any) error {
-	body, err := json.Marshal(in)
+	return c.do(ctx, http.MethodPost, path, in, out)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, in, out any) error {
+	var body io.Reader
+	if in != nil {
+		b, err := json.Marshal(in)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.Base+"/api/v1"+path, body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/api/v1"+path, bytes.NewReader(body))
-	if err != nil {
-		return err
+	if in != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Content-Type", "application/json")
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
 	}
@@ -60,7 +72,7 @@ func (c *Client) post(ctx context.Context, path string, in, out any) error {
 	}
 	h := c.HTTP
 	if h == nil {
-		h = &http.Client{Timeout: 30 * time.Second}
+		h = &http.Client{Timeout: 60 * time.Second}
 	}
 	res, err := h.Do(req)
 	if err != nil {
@@ -107,4 +119,18 @@ func (c *Client) Enroll(ctx context.Context, code, hostname string) (Enrolled, e
 // Report sends a snapshot.
 func (c *Client) Report(ctx context.Context, snapshot any) error {
 	return c.post(ctx, "/agent/report", snapshot, nil)
+}
+
+// Jobs waits up to wait for approved, signed jobs of this agent.
+func (c *Client) Jobs(ctx context.Context, wait time.Duration) ([]policy.SignedJob, error) {
+	var out struct {
+		Jobs []policy.SignedJob `json:"jobs"`
+	}
+	err := c.do(ctx, http.MethodGet, fmt.Sprintf("/agent/jobs?wait=%d", int(wait.Seconds())), nil, &out)
+	return out.Jobs, err
+}
+
+// Result reports how a job went.
+func (c *Client) Result(ctx context.Context, id string, ok bool, output string) error {
+	return c.post(ctx, "/agent/jobs/"+url.PathEscape(id)+"/result", map[string]any{"ok": ok, "output": output}, nil)
 }

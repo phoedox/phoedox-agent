@@ -86,3 +86,40 @@ func Save(dir string, s State) error {
 	}
 	return os.Rename(tmp.Name(), filepath.Join(dir, File))
 }
+
+// DoneFile remembers executed job IDs, so a signed job never runs twice.
+const DoneFile = "jobs-done.json"
+
+const maxDone = 500
+
+// Done reports whether a job ran already.
+func Done(dir, id string) bool {
+	for _, x := range loadDone(dir) {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkDone records a job ID (the newest 500 are kept; jobs expire long before).
+func MarkDone(dir, id string) error {
+	ids := append(loadDone(dir), id)
+	if len(ids) > maxDone {
+		ids = ids[len(ids)-maxDone:]
+	}
+	b, _ := json.Marshal(ids)
+	tmp := filepath.Join(dir, "."+DoneFile)
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(dir, DoneFile))
+}
+
+func loadDone(dir string) []string {
+	var ids []string
+	if b, err := os.ReadFile(filepath.Join(dir, DoneFile)); err == nil {
+		_ = json.Unmarshal(b, &ids)
+	}
+	return ids
+}

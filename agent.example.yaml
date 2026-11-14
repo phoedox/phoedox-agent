@@ -1,6 +1,7 @@
 # phoedox-agent configuration (/etc/phoedox-agent/agent.yaml)
-# Stage 2 (actions). Instance, agent ID and token come from
+# Actions (ADR-0036). Instance, agent ID and token come from
 # `phoedox-agent enroll` and live in credentials.json next to this file.
+# Without this file the agent only reads.
 # Actions this host allows. "read" is always allowed.
 # Options: container.restart, container.update, stack.redeploy, system.update, exec
 allow:

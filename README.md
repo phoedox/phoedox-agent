@@ -35,8 +35,25 @@ Als Dienst: [`deploy/phoedox-agent.service`](deploy/phoedox-agent.service) nach
 `/etc/systemd/system/` kopieren, dann `systemctl enable --now phoedox-agent`.
 
 Weitere Befehle: `phoedox-agent collect` (Stand als JSON ausgeben), `phoedox-agent report`
-(eine Meldung senden). Aktionen (Stufe 2) brauchen später zusätzlich die Freigaben
-aus [`agent.example.yaml`](agent.example.yaml).
+(eine Meldung senden), `phoedox-agent policy` (erlaubte Aktionen und vertraute Schlüssel).
+`DOCKER_HOST=unix:///run/podman/podman.sock` nutzt einen anderen Socket, z. B. Podman.
+
+## Aktionen (ADR-0036)
+
+Container neu starten, Compose-Stacks oder einzelne Dienste aktualisieren
+(`docker compose pull` + `up -d`), System-Updates (apt, dnf, apk) und freigegebene Befehle.
+Jede Aktion braucht drei Dinge:
+
+1. **Freigabe auf dem Host** in `/etc/phoedox-agent/agent.yaml` unter `allow`
+   (Vorlage: [`agent.example.yaml`](agent.example.yaml)).
+2. **Bestätigung in Phoedox** auf der Seite des Containers, Stacks oder Hosts.
+3. **Signatur** mit einem Ed25519-Schlüssel, den du unter *Sicherheit → Schlüssel für
+   Agent-Aufträge* in deinem Browser erzeugst. Der private Schlüssel verlässt den Browser
+   nie; den öffentlichen trägst du unter `adminKeys` ein. Phoedox selbst kann keine
+   Aufträge signieren.
+
+Aufträge laufen 10 Minuten ab und werden nur einmal ausgeführt (`jobs-done.json`).
+Der Agent holt sie per Long-Poll über HTTPS ab; es bleibt bei ausgehenden Verbindungen.
 
 ## Lizenz
 
