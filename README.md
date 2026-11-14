@@ -1,17 +1,17 @@
 # phoedox-agent
 
-Kleiner Agent für Server, VMs und LXC-Container. Er meldet Systemwerte, Pakete,
-Container, Images und Stacks an eine [Phoedox](https://github.com/phoedox/phoedox)-Instanz
-und führt freigegebene Aktionen aus (Container neu starten, Updates, Befehle).
+Small agent for servers, VMs and LXC containers. It reports system values, packages,
+containers, images and stacks to a [Phoedox](https://github.com/phoedox/phoedox) instance
+and runs approved actions (restart containers, updates, commands).
 
-- Verbindung **ausgehend** per WebSocket + mTLS – keine offenen Ports auf dem Server.
-- Jede Aktion braucht drei Dinge: lokale Freigabe in `agent.yaml`, Bestätigung in der Phoedox-Oberfläche und die Signatur eines Admin-Schlüssels.
-- Plattformen: Linux (amd64, arm64), Windows Server, macOS, FreeBSD/OPNsense/TrueNAS.
+- Connection is **outgoing** via WebSocket + mTLS – no open ports on the server.
+- Every action needs three things: local approval in `agent.yaml`, confirmation in the Phoedox interface and the signature of an admin key.
+- Platforms: Linux (amd64, arm64), Windows Server, macOS, FreeBSD/OPNsense/TrueNAS.
 
-## Stufe 1: lesende Meldungen (ADR-0033)
+## Stage 1: read-only reports (ADR-0033)
 
-Projekt-Besitzer erzeugen in Phoedox unter *Einstellungen → Agenten* einen Code
-(24 Stunden gültig, bis zu 20 Hosts). Auf dem Host:
+Project owners create a code in Phoedox under *Settings → Agents*
+(valid for 24 hours, up to 20 hosts). On the host:
 
 ```bash
 phoedox-agent enroll https://app.phoedox.com phxe_…
@@ -21,40 +21,40 @@ phoedox-agent enroll https://app.phoedox.com phxe_…
 phoedox-agent run
 ```
 
-`enroll` legt `credentials.json` (Modus 0600) in `/etc/phoedox-agent` ab
-(`PHOEDOX_AGENT_DIR` ändert den Ordner). `run` meldet jede Minute per HTTPS:
-Hostname, Betriebssystem, CPU, RAM, Datenträger, IP-Adressen, ob der Host eine VM
-oder ein LXC ist, installierte Pakete (dpkg, apk, rpm), die Docker-Version und die
-Container mit ihren Compose-Projekten (über `/var/run/docker.sock`, nur lesend).
-Phoedox baut daraus den Software-Baum: Einträge `server`/`vm`/`lxc`, wichtige Software
-(Docker, Proxmox VE, Portainer, Webserver, Datenbanken …) mit `installed_on`, Stacks mit
-`runs_on`/`managed_by` und Container mit `part_of`;
-von Hand gesetzte Namen und Attribute bleiben erhalten. Gesperrte Agenten beenden sich.
+`enroll` stores `credentials.json` (mode 0600) in `/etc/phoedox-agent`
+(`PHOEDOX_AGENT_DIR` changes the folder). `run` reports every minute via HTTPS:
+host name, operating system, CPU, RAM, disks, IP addresses, whether the host is a VM
+or an LXC, installed packages (dpkg, apk, rpm), the Docker version and the
+containers with their Compose projects (via `/var/run/docker.sock`, read-only).
+From this, Phoedox builds the software tree: entries `server`/`vm`/`lxc`, important software
+(Docker, Proxmox VE, Portainer, web servers, databases …) with `installed_on`, stacks with
+`runs_on`/`managed_by` and containers with `part_of`;
+names and attributes set by hand are kept. Blocked agents shut down.
 
-Als Dienst: [`deploy/phoedox-agent.service`](deploy/phoedox-agent.service) nach
-`/etc/systemd/system/` kopieren, dann `systemctl enable --now phoedox-agent`.
+As a service: copy [`deploy/phoedox-agent.service`](deploy/phoedox-agent.service) to
+`/etc/systemd/system/`, then run `systemctl enable --now phoedox-agent`.
 
-Weitere Befehle: `phoedox-agent collect` (Stand als JSON ausgeben), `phoedox-agent report`
-(eine Meldung senden), `phoedox-agent policy` (erlaubte Aktionen und vertraute Schlüssel).
-`DOCKER_HOST=unix:///run/podman/podman.sock` nutzt einen anderen Socket, z. B. Podman.
+More commands: `phoedox-agent collect` (print the state as JSON), `phoedox-agent report`
+(send one report), `phoedox-agent policy` (allowed actions and trusted keys).
+`DOCKER_HOST=unix:///run/podman/podman.sock` uses a different socket, e.g. Podman.
 
-## Aktionen (ADR-0036)
+## Actions (ADR-0036)
 
-Container neu starten, Compose-Stacks oder einzelne Dienste aktualisieren
-(`docker compose pull` + `up -d`), System-Updates (apt, dnf, apk) und freigegebene Befehle.
-Jede Aktion braucht drei Dinge:
+Restart containers, update Compose stacks or individual services
+(`docker compose pull` + `up -d`), system updates (apt, dnf, apk) and approved commands.
+Every action needs three things:
 
-1. **Freigabe auf dem Host** in `/etc/phoedox-agent/agent.yaml` unter `allow`
-   (Vorlage: [`agent.example.yaml`](agent.example.yaml)).
-2. **Bestätigung in Phoedox** auf der Seite des Containers, Stacks oder Hosts.
-3. **Signatur** mit einem Ed25519-Schlüssel, den du unter *Sicherheit → Schlüssel für
-   Agent-Aufträge* in deinem Browser erzeugst. Der private Schlüssel verlässt den Browser
-   nie; den öffentlichen trägst du unter `adminKeys` ein. Phoedox selbst kann keine
-   Aufträge signieren.
+1. **Approval on the host** in `/etc/phoedox-agent/agent.yaml` under `allow`
+   (template: [`agent.example.yaml`](agent.example.yaml)).
+2. **Confirmation in Phoedox** on the page of the container, stack or host.
+3. **Signature** with an Ed25519 key that you create in your browser under *Security → Keys for
+   agent jobs*. The private key never leaves the browser;
+   you enter the public key under `adminKeys`. Phoedox itself cannot
+   sign jobs.
 
-Aufträge laufen 10 Minuten ab und werden nur einmal ausgeführt (`jobs-done.json`).
-Der Agent holt sie per Long-Poll über HTTPS ab; es bleibt bei ausgehenden Verbindungen.
+Jobs expire after 10 minutes and are run only once (`jobs-done.json`).
+The agent fetches them via long poll over HTTPS; connections stay outgoing only.
 
-## Lizenz
+## License
 
-MIT – siehe [LICENSE](LICENSE).
+MIT – see [LICENSE](LICENSE).

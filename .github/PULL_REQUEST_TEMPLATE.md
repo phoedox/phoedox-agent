@@ -1,13 +1,13 @@
-## Was ändert sich?
+## What changes?
 
-## Warum?
+## Why?
 
 Closes #
 
-## Checkliste
+## Checklist
 
-- [ ] Tests ergänzt oder angepasst
-- [ ] Commits nach Conventional Commits
-- [ ] Oberflächentexte in Deutsch und Englisch (falls zutreffend)
-- [ ] Keine Geheimnisse oder echten Daten in Code, Tests oder Screenshots
-- [ ] Entscheidung in Phoedox angelegt oder aktualisiert (Projekt `phoedox`, ADR), falls eine Grundsatzentscheidung betroffen ist
+- [ ] Tests added or updated
+- [ ] Commits follow Conventional Commits
+- [ ] UI texts in German and English (if applicable)
+- [ ] No secrets or real data in code, tests or screenshots
+- [ ] Decision created or updated in Phoedox (project `phoedox`, ADR) if a fundamental decision is affected

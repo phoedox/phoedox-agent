@@ -1,23 +1,23 @@
-# Sicherheit
+# Security
 
-## Lücken melden
+## Reporting vulnerabilities
 
-Bitte melde Sicherheitslücken **vertraulich** über
-[GitHub Private Vulnerability Reporting](https://github.com/phoedox/phoedox-agent/security/advisories/new) dieses Repositories – nicht als öffentliches Issue.
+Please report security vulnerabilities **confidentially** through
+[GitHub Private Vulnerability Reporting](https://github.com/phoedox/phoedox-agent/security/advisories/new) of this repository – not as a public issue.
 
-Hilfreich sind: betroffene Version, Hosting-Art (Cloud, Docker, HA-Add-on), Schritte zum Nachstellen und mögliche Auswirkungen.
+Helpful details: affected version, hosting type (cloud, Docker, HA add-on), steps to reproduce and possible impact.
 
-## Was dann passiert
+## What happens next
 
-- Wir bestätigen den Eingang innerhalb von 3 Werktagen.
-- Wir halten dich über Bewertung und Behebung auf dem Laufenden.
-- Nach dem Fix veröffentlichen wir ein Security Advisory und nennen dich auf Wunsch.
+- We confirm receipt within 3 business days.
+- We keep you informed about the assessment and the fix.
+- After the fix, we publish a security advisory and credit you if you wish.
 
-## Besonders wichtig
+## Especially important
 
-Hinweise zu diesen Bereichen haben Vorrang: Rechteprüfung und Mandantentrennung, Agent-Aufträge (Signatur, Freigabeliste),
-Plugin-Sandbox und Host-API, Lizenz- und Store-Signaturen, Speicherung von Geheimnissen.
+Reports on these areas take priority: permission checks and tenant isolation, agent jobs (signature, allowlist),
+plugin sandbox and host API, license and store signatures, storage of secrets.
 
-## Unterstützte Versionen
+## Supported versions
 
-Sicherheitsupdates gibt es für die jeweils neueste Minor-Version.
+Security updates are provided for the latest minor version.
