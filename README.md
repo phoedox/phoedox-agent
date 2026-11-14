@@ -24,8 +24,11 @@ phoedox-agent run
 `enroll` legt `credentials.json` (Modus 0600) in `/etc/phoedox-agent` ab
 (`PHOEDOX_AGENT_DIR` ändert den Ordner). `run` meldet jede Minute per HTTPS:
 Hostname, Betriebssystem, CPU, RAM, Datenträger, IP-Adressen, ob der Host eine VM
-oder ein LXC ist, und die Docker-Container (über `/var/run/docker.sock`, nur lesend).
-Phoedox legt daraus Einträge `server`/`vm`/`lxc` und `container` mit `runs_on` an;
+oder ein LXC ist, installierte Pakete (dpkg, apk, rpm), die Docker-Version und die
+Container mit ihren Compose-Projekten (über `/var/run/docker.sock`, nur lesend).
+Phoedox baut daraus den Software-Baum: Einträge `server`/`vm`/`lxc`, wichtige Software
+(Docker, Proxmox VE, Portainer, Webserver, Datenbanken …) mit `installed_on`, Stacks mit
+`runs_on`/`managed_by` und Container mit `part_of`;
 von Hand gesetzte Namen und Attribute bleiben erhalten. Gesperrte Agenten beenden sich.
 
 Als Dienst: [`deploy/phoedox-agent.service`](deploy/phoedox-agent.service) nach

@@ -25,8 +25,11 @@ type Snapshot struct {
 	Virt       string      `json:"virt,omitempty"`
 	IPs        []string    `json:"ips,omitempty"`
 	Containers []Container `json:"containers,omitempty"`
-	Version    string      `json:"agentVersion,omitempty"`
-	TakenAt    time.Time   `json:"takenAt"`
+	Packages   []Package   `json:"packages,omitempty"`
+	// DockerVersion is the version of the Docker engine, if one answers.
+	DockerVersion string    `json:"dockerVersion,omitempty"`
+	Version       string    `json:"agentVersion,omitempty"`
+	TakenAt       time.Time `json:"takenAt"`
 }
 
 // Container is a Docker container on the host.
@@ -35,6 +38,10 @@ type Container struct {
 	Image string `json:"image"`
 	State string `json:"state"`
 	Ports string `json:"ports,omitempty"`
+	// Compose labels: project (stack), service and its folder.
+	Project    string `json:"project,omitempty"`
+	Service    string `json:"service,omitempty"`
+	ComposeDir string `json:"composeDir,omitempty"`
 }
 
 // Disk is the usage of one mount point.

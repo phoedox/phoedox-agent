@@ -4,10 +4,14 @@ package collect
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 func platform(s *Snapshot) {
@@ -24,6 +28,7 @@ func platform(s *Snapshot) {
 	}
 	s.MemTotal, s.MemAvail = meminfo("/proc/meminfo")
 	s.Virt = virt("/")
+	s.Packages = packages()
 	var st syscall.Statfs_t
 	if syscall.Statfs("/", &st) == nil {
 		s.Disks = append(s.Disks, Disk{Mount: "/", Total: st.Blocks * uint64(st.Bsize), Free: st.Bavail * uint64(st.Bsize)})
@@ -102,4 +107,26 @@ func virt(root string) string {
 		return "vm"
 	}
 	return ""
+}
+
+// packages reads the package database: dpkg and apk from their files, rpm
+// through the rpm command. Missing tools simply give no list.
+func packages() []Package {
+	if f, err := os.Open("/var/lib/dpkg/status"); err == nil {
+		defer f.Close()
+		return parseDpkg(f)
+	}
+	if f, err := os.Open("/lib/apk/db/installed"); err == nil {
+		defer f.Close()
+		return parseApk(f)
+	}
+	if path, err := exec.LookPath("rpm"); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, path, "-qa", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\n").Output()
+		if err == nil {
+			return parseRpmQuery(bytes.NewReader(out))
+		}
+	}
+	return nil
 }

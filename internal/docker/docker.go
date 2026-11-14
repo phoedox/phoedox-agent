@@ -19,10 +19,11 @@ import (
 const DefaultSocket = "/var/run/docker.sock"
 
 type apiContainer struct {
-	Names []string `json:"Names"`
-	Image string   `json:"Image"`
-	State string   `json:"State"`
-	Ports []struct {
+	Names  []string          `json:"Names"`
+	Image  string            `json:"Image"`
+	State  string            `json:"State"`
+	Labels map[string]string `json:"Labels"`
+	Ports  []struct {
 		IP          string `json:"IP"`
 		PrivatePort int    `json:"PrivatePort"`
 		PublicPort  int    `json:"PublicPort"`
@@ -30,30 +31,43 @@ type apiContainer struct {
 	} `json:"Ports"`
 }
 
-// Containers returns all containers (running or not) of the daemon at socket.
-func Containers(ctx context.Context, socket string) ([]collect.Container, error) {
+func get(ctx context.Context, socket, path string, out any) error {
 	c := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", socket)
 		},
 	}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://docker/containers/json?all=1", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://docker"+path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	res, err := c.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("docker: %s", res.Status)
+		return fmt.Errorf("docker: %s", res.Status)
 	}
+	return json.NewDecoder(res.Body).Decode(out)
+}
+
+// Containers returns all containers (running or not) of the daemon at socket.
+func Containers(ctx context.Context, socket string) ([]collect.Container, error) {
 	var list []apiContainer
-	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+	if err := get(ctx, socket, "/containers/json?all=1", &list); err != nil {
 		return nil, err
 	}
 	return convert(list), nil
+}
+
+// Version returns the engine version.
+func Version(ctx context.Context, socket string) (string, error) {
+	var v struct {
+		Version string `json:"Version"`
+	}
+	err := get(ctx, socket, "/version", &v)
+	return v.Version, err
 }
 
 func convert(list []apiContainer) []collect.Container {
@@ -76,7 +90,9 @@ func convert(list []apiContainer) []collect.Container {
 			}
 		}
 		sort.Strings(ports)
-		out = append(out, collect.Container{Name: name, Image: c.Image, State: c.State, Ports: strings.Join(ports, ", ")})
+		out = append(out, collect.Container{Name: name, Image: c.Image, State: c.State, Ports: strings.Join(ports, ", "),
+			Project: c.Labels["com.docker.compose.project"], Service: c.Labels["com.docker.compose.service"],
+			ComposeDir: c.Labels["com.docker.compose.project.working_dir"]})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out

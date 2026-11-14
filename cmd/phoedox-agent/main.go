@@ -72,6 +72,7 @@ func snapshot(ctx context.Context) collect.Snapshot {
 	s.Version = version
 	if cs, err := docker.Containers(ctx, docker.DefaultSocket); err == nil {
 		s.Containers = cs
+		s.DockerVersion, _ = docker.Version(ctx, docker.DefaultSocket)
 	}
 	return s
 }
