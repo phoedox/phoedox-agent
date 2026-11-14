@@ -11,6 +11,11 @@ import (
 type Package struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
+	// Source is the source package when it differs from Name (dpkg
+	// "Source:", apk "o:"); security advisories are keyed by it.
+	Source string `json:"source,omitempty"`
+	// SourceVersion is set when the source package has another version.
+	SourceVersion string `json:"sourceVersion,omitempty"`
 }
 
 // maxPackages caps the list (a full desktop has a few thousand).
@@ -38,12 +43,29 @@ func parseDpkg(r io.Reader) []Package {
 			cur.Name = strings.TrimPrefix(line, "Package: ")
 		case strings.HasPrefix(line, "Version: "):
 			cur.Version = strings.TrimPrefix(line, "Version: ")
+		case strings.HasPrefix(line, "Source: "):
+			// "Source: openssl" or "Source: glibc (2.36-9+deb12u4)"
+			src, ver, _ := strings.Cut(strings.TrimPrefix(line, "Source: "), " ")
+			cur.Source, cur.SourceVersion = src, strings.Trim(ver, "()")
 		case strings.HasPrefix(line, "Status: "):
 			installed = strings.HasSuffix(line, " installed")
 		}
 	}
 	flush()
 	return sorted(out)
+}
+
+// tidy drops source names equal to the package name.
+func tidy(p []Package) []Package {
+	for i := range p {
+		if p[i].Source == p[i].Name {
+			p[i].Source = ""
+		}
+		if p[i].SourceVersion == p[i].Version {
+			p[i].SourceVersion = ""
+		}
+	}
+	return p
 }
 
 // parseApk reads /lib/apk/db/installed: stanzas with P: (name) and V: (version).
@@ -64,6 +86,8 @@ func parseApk(r io.Reader) []Package {
 			cur.Name = line[2:]
 		case strings.HasPrefix(line, "V:"):
 			cur.Version = line[2:]
+		case strings.HasPrefix(line, "o:"):
+			cur.Source = line[2:]
 		}
 	}
 	if cur.Name != "" && len(out) < maxPackages {
@@ -86,6 +110,7 @@ func parseRpmQuery(r io.Reader) []Package {
 }
 
 func sorted(p []Package) []Package {
+	p = tidy(p)
 	sort.Slice(p, func(i, j int) bool { return p[i].Name < p[j].Name })
 	return p
 }

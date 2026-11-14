@@ -38,3 +38,37 @@ func TestParseRpm(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestSourcePackages(t *testing.T) {
+	status := `Package: libssl3
+Status: install ok installed
+Source: openssl
+Version: 3.0.15-1~deb12u1
+
+Package: libc6
+Status: install ok installed
+Source: glibc (2.36-9+deb12u9)
+Version: 2.36-9+deb12u9
+
+Package: bash
+Status: install ok installed
+Source: bash
+Version: 5.2.15-2+b7
+
+Package: libsqlite3-0
+Status: install ok installed
+Source: sqlite3 (3.40.1-2)
+Version: 3.40.1-2+b1
+`
+	got := parseDpkg(strings.NewReader(status))
+	want := map[string][2]string{"libssl3": {"openssl", ""}, "libc6": {"glibc", ""}, "bash": {"", ""}, "libsqlite3-0": {"sqlite3", "3.40.1-2"}}
+	for _, p := range got {
+		if w := want[p.Name]; p.Source != w[0] || p.SourceVersion != w[1] {
+			t.Errorf("%s: source %q %q, want %v", p.Name, p.Source, p.SourceVersion, w)
+		}
+	}
+	apk := parseApk(strings.NewReader("P:libcrypto3\nV:3.3.2-r0\no:openssl\n\nP:musl\nV:1.2.5-r0\no:musl\n"))
+	if apk[0].Name != "libcrypto3" || apk[0].Source != "openssl" || apk[1].Source != "" {
+		t.Fatalf("apk: %+v", apk)
+	}
+}
