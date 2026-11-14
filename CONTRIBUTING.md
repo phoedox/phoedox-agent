@@ -19,7 +19,7 @@ Our [Code of Conduct](CODE_OF_CONDUCT.md) applies. Please report violations to a
 
 1. Fork, branch from `main` (`feat/…`, `fix/…`).
 2. Changes with tests. The commands are in the repo's README or `CLAUDE.md`.
-3. Commits follow [Conventional Commits](https://www.conventionalcommits.org/de/) (`feat:`, `fix:`, `docs:` …) – versions and the changelog are generated from them.
+3. Commits follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) (`feat:`, `fix:`, `docs:` …) – versions and the changelog are generated from them.
 4. Pull request with the template filled in.
 
 ## License of your contributions
