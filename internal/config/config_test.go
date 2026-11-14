@@ -27,6 +27,14 @@ func TestLoad(t *testing.T) {
 	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "unknown action") {
 		t.Fatalf("unknown action: %v", err)
 	}
+	write("allow: [agent.update, wol, speedtest, terminal]\nterminalShell: /bin/zsh\n")
+	if c, err := Load(dir); err != nil || len(c.Allow) != 4 || c.TerminalShell != "/bin/zsh" {
+		t.Fatalf("new actions: %v %+v", err, c)
+	}
+	write("allow: [terminal]\nterminalShell: zsh\n")
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "terminalShell") {
+		t.Fatalf("relative shell: %v", err)
+	}
 	write("adminKeys: [nope]\n")
 	if _, err := Load(dir); err == nil {
 		t.Fatal("bad key must fail")

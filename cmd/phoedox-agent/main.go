@@ -13,6 +13,9 @@ import (
 	"math/rand/v2"
 	"os"
 	"os/signal"
+	"os/user"
+	"slices"
+	"sync"
 	"syscall"
 	"time"
 
@@ -22,7 +25,9 @@ import (
 	"github.com/phoedox/phoedox-agent/internal/docker"
 	"github.com/phoedox/phoedox-agent/internal/jobs"
 	"github.com/phoedox/phoedox-agent/internal/policy"
+	"github.com/phoedox/phoedox-agent/internal/speedtest"
 	"github.com/phoedox/phoedox-agent/internal/state"
+	"github.com/phoedox/phoedox-agent/internal/terminal"
 )
 
 var version = "dev"
@@ -39,7 +44,8 @@ Usage:
 
 The credentials are stored in $PHOEDOX_AGENT_DIR (default /etc/phoedox-agent).
 Actions run only if agent.yaml there allows them and the job carries the
-signature of a key listed under adminKeys.`
+signature of a key listed under adminKeys. "terminal" gives signed jobs an
+interactive shell as the agent's user: allow it only deliberately.`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -137,7 +143,11 @@ func run(ctx context.Context, args []string) error {
 	log.Printf("reporting to %s (project %s) every %s", st.Instance, st.Project, *interval)
 	if len(cfg.Allow) > 0 && len(cfg.AdminKeys) > 0 {
 		log.Printf("accepting signed jobs for: %v", cfg.Allow)
+		if slices.Contains(cfg.Allow, policy.ActTerminal) {
+			log.Printf("terminal is allowed: signed jobs can open a shell as %s", currentUser())
+		}
 		go jobLoop(ctx, c, st, cfg)
+		defer waitSessions(5 * time.Second)
 	}
 	failures := 0
 	for {
@@ -171,13 +181,67 @@ func showPolicy() error {
 	fmt.Println("allowed actions:", append([]string{policy.ActRead}, cfg.Allow...))
 	fmt.Println("exec commands:  ", cfg.ExecCommands)
 	fmt.Println("trusted keys:   ", len(cfg.AdminKeys))
+	if slices.Contains(cfg.Allow, policy.ActTerminal) {
+		shell := cfg.TerminalShell
+		if shell == "" {
+			shell = "/bin/bash or /bin/sh"
+		}
+		fmt.Printf("terminal:        ALLOWED – a signed job opens an interactive shell (%s) as %s,\n", shell, currentUser())
+		fmt.Println("                 relayed to the instance; sessions end after 60 min or 15 min without input")
+	} else {
+		fmt.Printf("terminal:        not allowed (add \"terminal\" to allow in %s to permit a web shell as %s)\n", config.File, currentUser())
+	}
 	return nil
+}
+
+// currentUser names the user the agent (and so a terminal) runs as.
+func currentUser() string {
+	if u, err := user.Current(); err == nil {
+		return fmt.Sprintf("user %s (uid %s)", u.Username, u.Uid)
+	}
+	return "the agent's user"
+}
+
+// sessions tracks running terminal sessions so shutdown can wait for them
+// to kill their shells.
+var sessions sync.WaitGroup
+
+// maxSessions limits concurrent terminal sessions.
+const maxSessions = 4
+
+func waitSessions(d time.Duration) {
+	done := make(chan struct{})
+	go func() { sessions.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(d):
+	}
 }
 
 // jobLoop waits for signed jobs and runs those that pass policy.Check.
 func jobLoop(ctx context.Context, c *client.Client, st state.State, cfg policy.Config) {
 	runner := jobs.New()
 	runner.Download = c.Download
+	runner.SpeedTest = func(ctx context.Context) (string, error) {
+		res, err := speedtest.Tester{Base: st.Instance, Token: st.Token, UserAgent: c.UserAgent}.Run(ctx)
+		if err != nil {
+			return "", err
+		}
+		return res.JSON(), nil
+	}
+	runner.Terminal = func(ctx context.Context, id string) (string, error) {
+		return terminal.Run(ctx, terminal.Options{Base: st.Instance, Token: st.Token, UserAgent: c.UserAgent,
+			SessionID: id, Shell: cfg.TerminalShell})
+	}
+	slots := make(chan struct{}, maxSessions)
+	report := func(id string, res jobs.Result) {
+		// The result is reported even while the agent stops.
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		if err := c.Result(rctx, id, res.OK, res.Output); err != nil {
+			log.Printf("job %s: report result: %v", id, err)
+		}
+	}
 	dir := state.Dir()
 	for ctx.Err() == nil {
 		list, err := c.Jobs(ctx, 25*time.Second)
@@ -201,13 +265,28 @@ func jobLoop(ctx context.Context, c *client.Client, st state.State, cfg policy.C
 			if err := cfg.Check(st.AgentID, sj, time.Now()); err != nil {
 				res.Output = err.Error()
 				log.Printf("job %s (%s) refused: %v", sj.Job.ID, sj.Job.Action, err)
+			} else if sj.Job.Action == policy.ActTerminal {
+				// A session lasts up to an hour: run it beside the other
+				// jobs and report when it ends.
+				select {
+				case slots <- struct{}{}:
+					log.Printf("job %s: %s %v", sj.Job.ID, sj.Job.Action, sj.Job.Args)
+					sessions.Add(1)
+					go func(j policy.Job) {
+						defer sessions.Done()
+						defer func() { <-slots }()
+						report(j.ID, runner.Run(ctx, j))
+					}(sj.Job)
+					continue
+				default:
+					res.Output = fmt.Sprintf("too many terminal sessions (at most %d)", maxSessions)
+					log.Printf("job %s (%s) refused: %s", sj.Job.ID, sj.Job.Action, res.Output)
+				}
 			} else {
 				log.Printf("job %s: %s %v", sj.Job.ID, sj.Job.Action, sj.Job.Args)
 				res = runner.Run(ctx, sj.Job)
 			}
-			if err := c.Result(ctx, sj.Job.ID, res.OK, res.Output); err != nil {
-				log.Printf("job %s: report result: %v", sj.Job.ID, err)
-			}
+			report(sj.Job.ID, res)
 			if runner.Restart {
 				// The service manager (systemd Restart=always, Docker restart
 				// policy) starts the new binary.

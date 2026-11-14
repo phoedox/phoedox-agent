@@ -25,6 +25,15 @@ const (
 	// ActAgentUpdate replaces the agent binary: args are the download path
 	// on the instance and the SHA-256 of the file, both part of the signed job.
 	ActAgentUpdate = "agent.update"
+	// ActWakeOnLAN sends a Wake-on-LAN magic packet: args are the MAC and an
+	// optional IPv4 broadcast address (UDP port 9).
+	ActWakeOnLAN = "wol"
+	// ActSpeedTest measures ping, download and upload to the instance.
+	ActSpeedTest = "speedtest"
+	// ActTerminal opens an interactive shell as the agent's user, relayed
+	// over an outbound WebSocket to the instance; the arg is the session ID.
+	// It is the most powerful action: allow it only deliberately.
+	ActTerminal = "terminal"
 )
 
 // Config is the local allowlist from agent.yaml. Read is always allowed.
@@ -34,6 +43,9 @@ type Config struct {
 	ExecCommands []string `json:"execCommands" yaml:"execCommands"`
 	// AdminKeys are base64 ed25519 public keys whose signatures are accepted.
 	AdminKeys []string `json:"adminKeys" yaml:"adminKeys"`
+	// TerminalShell is the absolute path of the shell for the terminal
+	// action; empty means /bin/bash if it exists, else /bin/sh.
+	TerminalShell string `json:"terminalShell,omitempty" yaml:"terminalShell"`
 }
 
 // Job is an approved action sent by the instance.

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -78,5 +79,52 @@ func TestAgentUpdatePolicy(t *testing.T) {
 	tampered.Job.Args = []string{job.Args[0], "f" + sum[1:]} // another binary
 	if err := allowed.Check("nas-01", tampered, now); !errors.Is(err, ErrSignature) {
 		t.Fatalf("tampered checksum: %v", err)
+	}
+}
+
+func TestNewActionsPolicy(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	keys := []string{base64.StdEncoding.EncodeToString(pub)}
+	cases := map[string][]string{
+		ActWakeOnLAN: {"aa:bb:cc:dd:ee:ff", "192.168.1.255"},
+		ActSpeedTest: nil,
+		ActTerminal:  {"Ab3dE6gH9jK2"},
+	}
+	for action, args := range cases {
+		t.Run(action, func(t *testing.T) {
+			job := Job{ID: "n1", Agent: "nas-01", Action: action, Args: args, Expires: now.Add(5 * time.Minute)}
+			sj, _ := Sign(job, priv)
+			allowed := Config{Allow: []string{action}, AdminKeys: keys}
+			if err := allowed.Check("nas-01", sj, now); err != nil {
+				t.Fatalf("allowed: %v", err)
+			}
+			// Every other action is allowed, but not this one.
+			others := Config{Allow: []string{ActContainerRestart, ActExec, ActAgentUpdate, ActWakeOnLAN, ActSpeedTest, ActTerminal}, AdminKeys: keys}
+			others.Allow = slices.DeleteFunc(others.Allow, func(a string) bool { return a == action })
+			if err := others.Check("nas-01", sj, now); !errors.Is(err, ErrNotAllowed) {
+				t.Fatalf("not in allow list: %v", err)
+			}
+			if err := allowed.Check("nas-01", sj, now.Add(5*time.Minute)); !errors.Is(err, ErrExpired) {
+				t.Fatalf("expired: %v", err)
+			}
+			if err := allowed.Check("pve-01", sj, now); !errors.Is(err, ErrWrongAgent) {
+				t.Fatalf("wrong agent: %v", err)
+			}
+			tampered := sj
+			tampered.Job.Args = append([]string{}, args...)
+			tampered.Job.Args = append(tampered.Job.Args, "x")
+			if err := allowed.Check("nas-01", tampered, now); !errors.Is(err, ErrSignature) {
+				t.Fatalf("tampered args: %v", err)
+			}
+			retarget := sj
+			retarget.Job.Action = ActTerminal
+			if action == ActTerminal {
+				retarget.Job.Action = ActSpeedTest
+			}
+			if err := (Config{Allow: []string{ActTerminal, ActSpeedTest}, AdminKeys: keys}).Check("nas-01", retarget, now); !errors.Is(err, ErrSignature) {
+				t.Fatalf("tampered action: %v", err)
+			}
+		})
 	}
 }

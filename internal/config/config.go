@@ -19,7 +19,8 @@ const File = "agent.yaml"
 
 var known = map[string]bool{
 	policy.ActContainerRestart: true, policy.ActContainerUpdate: true, policy.ActStackRedeploy: true,
-	policy.ActSystemUpdate: true, policy.ActExec: true,
+	policy.ActSystemUpdate: true, policy.ActExec: true, policy.ActAgentUpdate: true,
+	policy.ActWakeOnLAN: true, policy.ActSpeedTest: true, policy.ActTerminal: true,
 }
 
 // Load reads dir/agent.yaml; a missing file means "read only".
@@ -45,6 +46,9 @@ func Load(dir string) (policy.Config, error) {
 		if err != nil || len(pub) != ed25519.PublicKeySize {
 			return c, fmt.Errorf("%s: adminKeys entry %q is not a base64 ed25519 public key", File, k)
 		}
+	}
+	if c.TerminalShell != "" && (!filepath.IsAbs(c.TerminalShell) || filepath.Clean(c.TerminalShell) != c.TerminalShell) {
+		return c, fmt.Errorf("%s: terminalShell must be an absolute path", File)
 	}
 	return c, nil
 }

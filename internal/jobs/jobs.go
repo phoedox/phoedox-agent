@@ -18,6 +18,7 @@ import (
 
 	"github.com/phoedox/phoedox-agent/internal/docker"
 	"github.com/phoedox/phoedox-agent/internal/policy"
+	"github.com/phoedox/phoedox-agent/internal/terminal"
 )
 
 // Result is what the agent reports back.
@@ -39,6 +40,16 @@ type Runner struct {
 	// Restart is set after the binary was replaced; the caller exits so the
 	// service manager starts the new version.
 	Restart bool
+	// WOLSend sends a magic packet to addr (host:9); nil sends it three
+	// times over UDP, 100 ms apart.
+	WOLSend func(ctx context.Context, addr string, pkt []byte) error
+	// SpeedTest measures the connection to the instance and returns the
+	// result as JSON; nil means the action is not available.
+	SpeedTest func(ctx context.Context) (string, error)
+	// Terminal runs one terminal session until it ends; nil means the
+	// action is not available. It blocks for up to an hour, so the caller
+	// runs terminal jobs in their own goroutine.
+	Terminal func(ctx context.Context, sessionID string) (string, error)
 }
 
 // New returns a runner that uses the real system.
@@ -130,6 +141,29 @@ func (r *Runner) run(ctx context.Context, j policy.Job) (string, error) {
 		return log.String(), nil
 	case policy.ActAgentUpdate:
 		return r.update(ctx, arg(0), arg(1))
+	case policy.ActWakeOnLAN:
+		if len(j.Args) > 2 {
+			return "", errors.New("wol takes a MAC and an optional broadcast address")
+		}
+		return r.wakeOnLAN(ctx, arg(0), arg(1))
+	case policy.ActSpeedTest:
+		if len(j.Args) != 0 {
+			return "", errors.New("speedtest takes no arguments")
+		}
+		if r.SpeedTest == nil {
+			return "", errors.New("speed test is not available")
+		}
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+		defer cancel()
+		return r.SpeedTest(ctx)
+	case policy.ActTerminal:
+		if len(j.Args) != 1 || !terminal.ValidSessionID(j.Args[0]) {
+			return "", errors.New("terminal needs a session ID")
+		}
+		if r.Terminal == nil {
+			return "", errors.New("terminal is not available")
+		}
+		return r.Terminal(ctx, j.Args[0])
 	case policy.ActExec:
 		if len(j.Args) == 0 || !filepath.IsAbs(j.Args[0]) {
 			return "", errors.New("exec needs an absolute command path")

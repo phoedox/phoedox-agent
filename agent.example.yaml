@@ -3,13 +3,23 @@
 # `phoedox-agent enroll` and live in credentials.json next to this file.
 # Without this file the agent only reads.
 # Actions this host allows. "read" is always allowed.
-# Options: container.restart, container.update, stack.redeploy, system.update, exec, agent.update
+# Options: container.restart, container.update, stack.redeploy, system.update, exec,
+#          agent.update, wol, speedtest, terminal
+#   wol        Wake-on-LAN magic packet (UDP broadcast, port 9). Only reaches
+#              hosts in the same broadcast domain (LAN/VLAN) as this agent.
+#   speedtest  Ping, download and upload between this host and the instance.
+#   terminal   POWERFUL: an interactive shell as the agent's user (root when
+#              the agent runs as root), relayed to the browser over an
+#              outbound WebSocket. Allow it only deliberately, on hosts where
+#              the signing admins may have a shell anyway.
 allow:
   - container.restart
 # Glob patterns for exec (only if "exec" is allowed above)
 execCommands: []
 # Admin public keys (base64 ed25519) whose signed jobs are accepted
 adminKeys: []
+# Shell for "terminal" (absolute path); default /bin/bash, else /bin/sh
+# terminalShell: /bin/bash
 # Mode: host | proxmox-host | docker
 mode: host
 # Network discovery (ARP, mDNS, SNMP, LLDP); organisations can force this off

@@ -2,7 +2,8 @@
 
 Small agent for servers, VMs and LXC containers. It reports system values, packages,
 containers, images and stacks to a [Phoedox](https://github.com/phoedox/phoedox) instance
-and runs approved actions (restart containers, updates, commands).
+and runs approved actions (restart containers, updates, commands, Wake-on-LAN,
+speed tests, web terminal).
 
 - Connection is **outgoing** via WebSocket + mTLS – no open ports on the server.
 - Every action needs three things: local approval in `agent.yaml`, confirmation in the Phoedox interface and the signature of an admin key.
@@ -54,6 +55,32 @@ Every action needs three things:
 
 Jobs expire after 10 minutes and are run only once (`jobs-done.json`).
 The agent fetches them via long poll over HTTPS; connections stay outgoing only.
+
+### Wake-on-LAN, speed test and terminal
+
+| Action | Args | What it does |
+| --- | --- | --- |
+| `wol` | MAC (`aa:bb:cc:dd:ee:ff`, `aa-bb-…` or `aabbccddeeff`), optional IPv4 broadcast address (default `255.255.255.255`) | Sends the magic packet three times, 100 ms apart, to UDP port 9. |
+| `speedtest` | – | Measures ping (median of 5), download and upload between this host and the instance; output `{"down":312.4,"up":95.1,"ping":2.3}` (Mbit/s, ms). |
+| `terminal` | session ID | Opens an interactive shell in the browser (see below). |
+
+- **`wol` needs the agent in the same broadcast domain** (LAN/VLAN) as the
+  machine to wake: routers do not forward broadcasts. For another subnet, use its
+  directed broadcast address (e.g. `192.168.20.255`) if the router allows it, or an
+  agent in that network.
+- `speedtest` only talks to the instance (`/api/v1/agent/speedtest/…` with the agent
+  token): a 2 MiB probe, then a download sized for about 4 seconds (4–100 MiB) and an
+  upload of the same size (at most 25 MiB).
+- **`terminal` is powerful: it is a shell as the agent's user** – root if the agent runs
+  as root. Allow it only deliberately, on hosts where the admins whose keys are under
+  `adminKeys` may have a shell anyway. `phoedox-agent policy` shows whether it is
+  allowed and as which user. The agent connects **outbound** to
+  `wss://<instance>/api/v1/agent/terminal/<session>` with its token and starts
+  `terminalShell` (default `/bin/bash`, else `/bin/sh`) as a login shell in a PTY with
+  `TERM=xterm-256color`. A session ends after 60 minutes, after 15 minutes without input,
+  when the shell exits or the connection closes; then the shell's process group is
+  killed. At most 4 sessions run at once, beside other jobs. The agent logs only the
+  start and end of a session, never its content. Linux, macOS and FreeBSD only.
 
 ## License
 
