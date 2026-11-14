@@ -102,6 +102,28 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 	return nil
 }
 
+// Download streams a file from the instance (agent releases). path is
+// absolute on the instance, e.g. /api/v1/agent/releases/….
+func (c *Client) Download(ctx context.Context, path string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	res, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		res.Body.Close()
+		return nil, fmt.Errorf("instance: %s", res.Status)
+	}
+	return res.Body, nil
+}
+
 // Enrolled is the instance's answer to an enrollment.
 type Enrolled struct {
 	AgentID string `json:"agentId"`

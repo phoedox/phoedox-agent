@@ -3,7 +3,7 @@
 # `phoedox-agent enroll` and live in credentials.json next to this file.
 # Without this file the agent only reads.
 # Actions this host allows. "read" is always allowed.
-# Options: container.restart, container.update, stack.redeploy, system.update, exec
+# Options: container.restart, container.update, stack.redeploy, system.update, exec, agent.update
 allow:
   - container.restart
 # Glob patterns for exec (only if "exec" is allowed above)
@@ -14,5 +14,6 @@ adminKeys: []
 mode: host
 # Network discovery (ARP, mDNS, SNMP, LLDP); organisations can force this off
 discovery: false
-# Self-update: auto (signed, version approved by admin) | notify
-update: auto
+# Self-update: allow "agent.update" above. An admin signs the update job in
+# Phoedox; it names the release (downloaded from the instance only) and its
+# SHA-256, so the agent installs exactly that binary and restarts.

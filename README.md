@@ -41,7 +41,7 @@ More commands: `phoedox-agent collect` (print the state as JSON), `phoedox-agent
 ## Actions (ADR-0036)
 
 Restart containers, update Compose stacks or individual services
-(`docker compose pull` + `up -d`), system updates (apt, dnf, apk) and approved commands.
+(`docker compose pull` + `up -d`), system updates (apt, dnf, apk), approved commands and its own update (`agent.update`: the binary comes from the instance, its SHA-256 is part of the signed job; the old binary stays as `.old`).
 Every action needs three things:
 
 1. **Approval on the host** in `/etc/phoedox-agent/agent.yaml` under `allow`

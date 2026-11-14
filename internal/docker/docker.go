@@ -30,11 +30,12 @@ func Socket() string {
 }
 
 type apiContainer struct {
-	Names  []string          `json:"Names"`
-	Image  string            `json:"Image"`
-	State  string            `json:"State"`
-	Labels map[string]string `json:"Labels"`
-	Ports  []struct {
+	Names   []string          `json:"Names"`
+	Image   string            `json:"Image"`
+	ImageID string            `json:"ImageID"`
+	State   string            `json:"State"`
+	Labels  map[string]string `json:"Labels"`
+	Ports   []struct {
 		IP          string `json:"IP"`
 		PrivatePort int    `json:"PrivatePort"`
 		PublicPort  int    `json:"PublicPort"`
@@ -91,7 +92,59 @@ func Containers(ctx context.Context, socket string) ([]collect.Container, error)
 	if err := get(ctx, socket, "/containers/json?all=1", &list); err != nil {
 		return nil, err
 	}
-	return convert(list), nil
+	out := convert(list)
+	// Registry digests per image (one lookup per image, failures leave it empty).
+	digests := map[string][]string{}
+	for i, c := range list {
+		if c.ImageID == "" {
+			continue
+		}
+		rd, ok := digests[c.ImageID]
+		if !ok {
+			var img struct {
+				RepoDigests []string `json:"RepoDigests"`
+			}
+			if get(ctx, socket, "/images/"+url.PathEscape(c.ImageID)+"/json", &img) == nil {
+				rd = img.RepoDigests
+			}
+			digests[c.ImageID] = rd
+		}
+		name := strings.TrimPrefix(c.Names[0], "/")
+		for j := range out {
+			if out[j].Name == name {
+				out[j].Digest = RepoDigest(list[i].Image, rd)
+			}
+		}
+	}
+	return out, nil
+}
+
+// RepoDigest picks the digest of an image's repository from RepoDigests
+// ("repo@sha256:…"); with a single entry that one.
+func RepoDigest(image string, repoDigests []string) string {
+	repo := image
+	if i := strings.LastIndex(repo, "@"); i >= 0 {
+		repo = repo[:i]
+	}
+	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+		repo = repo[:i]
+	}
+	norm := func(r string) string {
+		r = strings.TrimPrefix(r, "docker.io/")
+		return strings.TrimPrefix(r, "library/")
+	}
+	for _, rd := range repoDigests {
+		r, d, ok := strings.Cut(rd, "@")
+		if ok && norm(r) == norm(repo) {
+			return d
+		}
+	}
+	if len(repoDigests) == 1 {
+		if _, d, ok := strings.Cut(repoDigests[0], "@"); ok {
+			return d
+		}
+	}
+	return ""
 }
 
 // Version returns the engine version.

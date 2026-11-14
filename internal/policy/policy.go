@@ -22,6 +22,9 @@ const (
 	ActStackRedeploy    = "stack.redeploy"
 	ActSystemUpdate     = "system.update"
 	ActExec             = "exec"
+	// ActAgentUpdate replaces the agent binary: args are the download path
+	// on the instance and the SHA-256 of the file, both part of the signed job.
+	ActAgentUpdate = "agent.update"
 )
 
 // Config is the local allowlist from agent.yaml. Read is always allowed.

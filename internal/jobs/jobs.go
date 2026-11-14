@@ -4,8 +4,12 @@ package jobs
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -27,11 +31,19 @@ type Runner struct {
 	DockerSocket string
 	Command      func(ctx context.Context, name string, args ...string) ([]byte, error)
 	LookPath     func(string) (string, error)
+	// Download fetches a path from the instance (agent updates come only
+	// from there, never from elsewhere).
+	Download func(ctx context.Context, path string) (io.ReadCloser, error)
+	// Executable is the path of the running agent binary.
+	Executable func() (string, error)
+	// Restart is set after the binary was replaced; the caller exits so the
+	// service manager starts the new version.
+	Restart bool
 }
 
 // New returns a runner that uses the real system.
 func New() *Runner {
-	return &Runner{DockerSocket: docker.Socket(), LookPath: exec.LookPath,
+	return &Runner{DockerSocket: docker.Socket(), LookPath: exec.LookPath, Executable: os.Executable,
 		Command: func(ctx context.Context, name string, args ...string) ([]byte, error) {
 			return exec.CommandContext(ctx, name, args...).CombinedOutput()
 		}}
@@ -116,6 +128,8 @@ func (r *Runner) run(ctx context.Context, j policy.Job) (string, error) {
 			}
 		}
 		return log.String(), nil
+	case policy.ActAgentUpdate:
+		return r.update(ctx, arg(0), arg(1))
 	case policy.ActExec:
 		if len(j.Args) == 0 || !filepath.IsAbs(j.Args[0]) {
 			return "", errors.New("exec needs an absolute command path")
@@ -126,6 +140,65 @@ func (r *Runner) run(ctx context.Context, j policy.Job) (string, error) {
 		return string(out), err
 	}
 	return "", fmt.Errorf("unknown action %q", j.Action)
+}
+
+const releasePrefix = "/api/v1/agent/releases/"
+
+var sumRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// update replaces the agent binary with the file at path on the instance
+// if its SHA-256 matches the signed job; the old binary stays as .old.
+func (r *Runner) update(ctx context.Context, path, sum string) (string, error) {
+	if !strings.HasPrefix(path, releasePrefix) || strings.Contains(path, "..") || !sumRe.MatchString(sum) {
+		return "", errors.New("agent.update needs a release path on the instance and a SHA-256")
+	}
+	if r.Download == nil || r.Executable == nil {
+		return "", errors.New("updates are not available")
+	}
+	exe, err := r.Executable()
+	if err != nil {
+		return "", err
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	body, err := r.Download(ctx, path)
+	if err != nil {
+		return "", fmt.Errorf("download: %w", err)
+	}
+	defer body.Close()
+	tmp, err := os.CreateTemp(filepath.Dir(exe), ".phoedox-agent-update-*")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name()) // no-op after the rename
+	h := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(tmp, h), io.LimitReader(body, 200<<20)); err != nil {
+		tmp.Close()
+		return "", fmt.Errorf("download: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); got != sum {
+		return "", fmt.Errorf("checksum mismatch: got %s, the signed job says %s", got, sum)
+	}
+	if err := os.Chmod(tmp.Name(), 0o755); err != nil {
+		return "", err
+	}
+	// Windows cannot overwrite a running binary, but it can rename it.
+	_ = os.Remove(exe + ".old")
+	if err := os.Rename(exe, exe+".old"); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp.Name(), exe); err != nil {
+		_ = os.Rename(exe+".old", exe)
+		return "", err
+	}
+	r.Restart = true
+	return "updated " + exe + " (sha256 " + sum[:12] + "…); restarting", nil
 }
 
 func (r *Runner) updateSteps() [][]string {

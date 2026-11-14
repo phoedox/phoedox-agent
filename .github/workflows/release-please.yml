@@ -7,8 +7,37 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - id: rp
+        uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Binaries for every platform plus SHA256SUMS. Instances proxy these for
+  # agent self-updates; the checksum is part of the signed update job.
+  binaries:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ needs.release.outputs.tag }}" }
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - name: Build
+        env: { TAG: "${{ needs.release.outputs.tag }}" }
+        run: |
+          mkdir dist
+          for p in linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64 freebsd/amd64; do
+            os=${p%/*}; arch=${p#*/}; ext=""; [ "$os" = windows ] && ext=.exe
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=${TAG#v}" \
+              -o "dist/phoedox-agent-$os-$arch$ext" ./cmd/phoedox-agent
+          done
+          (cd dist && sha256sum phoedox-agent-* > SHA256SUMS)
+      - name: Upload
+        env: { GH_TOKEN: "${{ github.token }}", TAG: "${{ needs.release.outputs.tag }}" }
+        run: gh release upload "$TAG" dist/* --clobber

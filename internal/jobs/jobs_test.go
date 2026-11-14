@@ -1,10 +1,15 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -91,5 +96,47 @@ func TestRestart(t *testing.T) {
 	}
 	if res := r.Run(context.Background(), policy.Job{Action: policy.ActContainerRestart, Args: []string{"../x"}}); res.OK {
 		t.Fatal("bad name")
+	}
+}
+
+func TestAgentUpdate(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "phoedox-agent")
+	if err := os.WriteFile(exe, []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	newBin := []byte("new binary")
+	sum := sha256.Sum256(newBin)
+	good := hex.EncodeToString(sum[:])
+	var asked string
+	r := &Runner{Executable: func() (string, error) { return exe, nil },
+		Download: func(_ context.Context, path string) (io.ReadCloser, error) {
+			asked = path
+			return io.NopCloser(bytes.NewReader(newBin)), nil
+		}}
+	path := "/api/v1/agent/releases/v0.3.0/phoedox-agent-linux-amd64"
+	job := func(args ...string) policy.Job { return policy.Job{Action: policy.ActAgentUpdate, Args: args} }
+
+	for _, args := range [][]string{{"https://evil.example/agent", good}, {path, "abc"}, {"/api/v1/agent/releases/../../x", good}} {
+		if res := r.Run(context.Background(), job(args...)); res.OK {
+			t.Fatalf("accepted %v", args)
+		}
+	}
+	bad := strings.Repeat("0", 64)
+	if res := r.Run(context.Background(), job(path, bad)); res.OK || !strings.Contains(res.Output, "checksum mismatch") {
+		t.Fatalf("wrong checksum: %+v", res)
+	}
+	if b, _ := os.ReadFile(exe); string(b) != "old" || r.Restart {
+		t.Fatal("binary replaced despite wrong checksum")
+	}
+	res := r.Run(context.Background(), job(path, good))
+	if !res.OK || !r.Restart || asked != path {
+		t.Fatalf("update: %+v restart=%v asked=%s", res, r.Restart, asked)
+	}
+	if b, _ := os.ReadFile(exe); string(b) != "new binary" {
+		t.Fatalf("binary: %q", b)
+	}
+	if b, _ := os.ReadFile(exe + ".old"); string(b) != "old" {
+		t.Fatalf("old binary kept: %q", b)
 	}
 }

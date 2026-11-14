@@ -11,16 +11,22 @@ import (
 
 // Snapshot is the read-only state of one host.
 type Snapshot struct {
-	Hostname  string `json:"hostname"`
-	OS        string `json:"os"`
-	Arch      string `json:"arch"`
-	CPUs      int    `json:"cpus"`
-	Kernel    string `json:"kernel,omitempty"`
-	Distro    string `json:"distro,omitempty"`
-	UptimeSec int64  `json:"uptimeSec,omitempty"`
-	MemTotal  uint64 `json:"memTotalBytes,omitempty"`
-	MemAvail  uint64 `json:"memAvailableBytes,omitempty"`
-	Disks     []Disk `json:"disks,omitempty"`
+	Hostname string `json:"hostname"`
+	OS       string `json:"os"`
+	Arch     string `json:"arch"`
+	CPUs     int    `json:"cpus"`
+	Kernel   string `json:"kernel,omitempty"`
+	Distro   string `json:"distro,omitempty"`
+	// OSID and OSVersion come from os-release (ID, VERSION_ID), e.g.
+	// "debian" and "12"; the instance uses them to look up vulnerabilities.
+	OSID      string `json:"osId,omitempty"`
+	OSVersion string `json:"osVersion,omitempty"`
+	// PackageFormat is "deb", "apk" or "rpm" (where Packages come from).
+	PackageFormat string `json:"packageFormat,omitempty"`
+	UptimeSec     int64  `json:"uptimeSec,omitempty"`
+	MemTotal      uint64 `json:"memTotalBytes,omitempty"`
+	MemAvail      uint64 `json:"memAvailableBytes,omitempty"`
+	Disks         []Disk `json:"disks,omitempty"`
 	// Virt is "vm", "lxc", "container" or empty for bare metal / unknown.
 	Virt       string      `json:"virt,omitempty"`
 	IPs        []string    `json:"ips,omitempty"`
@@ -38,6 +44,9 @@ type Container struct {
 	Image string `json:"image"`
 	State string `json:"state"`
 	Ports string `json:"ports,omitempty"`
+	// Digest is the registry digest of the image (sha256:…) when the image
+	// came from a registry; the instance compares it with the registry.
+	Digest string `json:"digest,omitempty"`
 	// Compose labels: project (stack), service and its folder.
 	Project    string `json:"project,omitempty"`
 	Service    string `json:"service,omitempty"`

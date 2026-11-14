@@ -19,6 +19,7 @@ func platform(s *Snapshot) {
 		s.Kernel = strings.TrimSpace(string(b))
 	}
 	s.Distro = osRelease("/etc/os-release")
+	s.OSID, s.OSVersion = osIdent("/etc/os-release")
 	if b, err := os.ReadFile("/proc/uptime"); err == nil {
 		if f := strings.Fields(string(b)); len(f) > 0 {
 			if v, err := strconv.ParseFloat(f[0], 64); err == nil {
@@ -28,7 +29,7 @@ func platform(s *Snapshot) {
 	}
 	s.MemTotal, s.MemAvail = meminfo("/proc/meminfo")
 	s.Virt = virt("/")
-	s.Packages = packages()
+	s.Packages, s.PackageFormat = packages()
 	var st syscall.Statfs_t
 	if syscall.Statfs("/", &st) == nil {
 		s.Disks = append(s.Disks, Disk{Mount: "/", Total: st.Blocks * uint64(st.Bsize), Free: st.Bavail * uint64(st.Bsize)})
@@ -49,6 +50,24 @@ func osRelease(path string) string {
 		}
 	}
 	return ""
+}
+
+// osIdent returns ID and VERSION_ID from an os-release file.
+func osIdent(path string) (id, version string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", ""
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		if v, ok := strings.CutPrefix(sc.Text(), "ID="); ok {
+			id = strings.Trim(v, `"`)
+		} else if v, ok := strings.CutPrefix(sc.Text(), "VERSION_ID="); ok {
+			version = strings.Trim(v, `"`)
+		}
+	}
+	return id, version
 }
 
 // meminfo parses MemTotal and MemAvailable (kB) from /proc/meminfo.
@@ -111,22 +130,22 @@ func virt(root string) string {
 
 // packages reads the package database: dpkg and apk from their files, rpm
 // through the rpm command. Missing tools simply give no list.
-func packages() []Package {
+func packages() ([]Package, string) {
 	if f, err := os.Open("/var/lib/dpkg/status"); err == nil {
 		defer f.Close()
-		return parseDpkg(f)
+		return parseDpkg(f), "deb"
 	}
 	if f, err := os.Open("/lib/apk/db/installed"); err == nil {
 		defer f.Close()
-		return parseApk(f)
+		return parseApk(f), "apk"
 	}
 	if path, err := exec.LookPath("rpm"); err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		out, err := exec.CommandContext(ctx, path, "-qa", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\n").Output()
 		if err == nil {
-			return parseRpmQuery(bytes.NewReader(out))
+			return parseRpmQuery(bytes.NewReader(out)), "rpm"
 		}
 	}
-	return nil
+	return nil, ""
 }

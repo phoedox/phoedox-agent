@@ -55,3 +55,28 @@ func TestCheck(t *testing.T) {
 		}
 	})
 }
+
+func TestAgentUpdatePolicy(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	keys := []string{base64.StdEncoding.EncodeToString(pub)}
+	sum := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	job := Job{ID: "u1", Agent: "nas-01", Action: ActAgentUpdate, Args: []string{"/api/v1/agent/releases/v0.3.0/phoedox-agent-linux-amd64", sum}, Expires: now.Add(5 * time.Minute)}
+	sj, _ := Sign(job, priv)
+
+	allowed := Config{Allow: []string{ActAgentUpdate}, AdminKeys: keys}
+	if err := allowed.Check("nas-01", sj, now); err != nil {
+		t.Fatalf("allowed: %v", err)
+	}
+	if err := (Config{Allow: []string{ActContainerRestart}, AdminKeys: keys}).Check("nas-01", sj, now); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("forbidden: %v", err)
+	}
+	if err := allowed.Check("nas-01", sj, now.Add(time.Hour)); !errors.Is(err, ErrExpired) {
+		t.Fatalf("expired: %v", err)
+	}
+	tampered := sj
+	tampered.Job.Args = []string{job.Args[0], "f" + sum[1:]} // another binary
+	if err := allowed.Check("nas-01", tampered, now); !errors.Is(err, ErrSignature) {
+		t.Fatalf("tampered checksum: %v", err)
+	}
+}

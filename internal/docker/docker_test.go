@@ -51,3 +51,22 @@ func TestContainers(t *testing.T) {
 		t.Fatal("missing socket must fail")
 	}
 }
+
+func TestRepoDigest(t *testing.T) {
+	cases := []struct {
+		image string
+		rd    []string
+		want  string
+	}{
+		{"nginx:1.27", []string{"nginx@sha256:aaa"}, "sha256:aaa"},
+		{"nginx", []string{"docker.io/library/nginx@sha256:bbb"}, "sha256:bbb"},
+		{"ghcr.io/phoedox/phoedox:latest", []string{"ghcr.io/other/x@sha256:c", "ghcr.io/phoedox/phoedox@sha256:ddd"}, "sha256:ddd"},
+		{"localhost:5000/app:1", []string{"localhost:5000/app@sha256:eee"}, "sha256:eee"},
+		{"built-locally", nil, ""},
+	}
+	for _, c := range cases {
+		if got := RepoDigest(c.image, c.rd); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.image, got, c.want)
+		}
+	}
+}

@@ -177,6 +177,7 @@ func showPolicy() error {
 // jobLoop waits for signed jobs and runs those that pass policy.Check.
 func jobLoop(ctx context.Context, c *client.Client, st state.State, cfg policy.Config) {
 	runner := jobs.New()
+	runner.Download = c.Download
 	dir := state.Dir()
 	for ctx.Err() == nil {
 		list, err := c.Jobs(ctx, 25*time.Second)
@@ -206,6 +207,12 @@ func jobLoop(ctx context.Context, c *client.Client, st state.State, cfg policy.C
 			}
 			if err := c.Result(ctx, sj.Job.ID, res.OK, res.Output); err != nil {
 				log.Printf("job %s: report result: %v", sj.Job.ID, err)
+			}
+			if runner.Restart {
+				// The service manager (systemd Restart=always, Docker restart
+				// policy) starts the new binary.
+				log.Printf("agent updated, exiting to restart")
+				os.Exit(0)
 			}
 		}
 	}
