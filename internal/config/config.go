@@ -60,5 +60,8 @@ func Load(dir string) (policy.Config, error) {
 			return c, fmt.Errorf("%s: homeassistant.tokenFile must be an absolute path", File)
 		}
 	}
+	if err := c.SNMP.Validate(); err != nil {
+		return c, fmt.Errorf("%s: %w", File, err)
+	}
 	return c, nil
 }

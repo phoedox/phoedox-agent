@@ -4,6 +4,7 @@ package collect
 
 import (
 	"github.com/phoedox/phoedox-agent/internal/homeassistant"
+	"github.com/phoedox/phoedox-agent/internal/snmp"
 
 	"net"
 	"os"
@@ -41,6 +42,9 @@ type Snapshot struct {
 	// HomeAssistant is what the agent read from a Home Assistant in its
 	// network (homeassistant in agent.yaml).
 	HomeAssistant *homeassistant.Report `json:"homeassistant,omitempty"`
+	// SNMP is what the agent polled from switches and routers (snmp in
+	// agent.yaml); sent only after a poll.
+	SNMP []snmp.Device `json:"snmp,omitempty"`
 }
 
 // Container is a Docker container on the host.

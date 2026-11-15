@@ -106,6 +106,36 @@ homeassistant:
   a signed job like every other action.
 - Reading may fail without stopping the agent; the report then names the error.
 
+## SNMP: switches, routers and access points
+
+The agent can poll network devices that do not run an agent. Polling is read-only (no SET requests) and is configured only in `agent.yaml`; the instance cannot add targets. Communities and keys are read from local files and never leave this host.
+
+```yaml
+snmp:
+  everyMinutes: 15        # default 15
+  targets:
+    - host: 10.0.0.2
+      name: Core switch   # optional, else sysName
+      communityFile: /etc/phoedox-agent/snmp-community   # SNMP v2c
+    - host: 10.0.0.1
+      version: "3"
+      user: phoedox
+      authProtocol: SHA256          # SHA (default), SHA256, SHA512, MD5
+      authKeyFile: /etc/phoedox-agent/snmp-auth
+      privProtocol: AES             # AES (default), AES256, DES, none
+      privKeyFile: /etc/phoedox-agent/snmp-priv
+```
+
+Each poll reads:
+- system data (sysName, sysDescr, location, uptime);
+- interfaces with name, alias, speed, MAC and status;
+- LLDP neighbours;
+- the MAC address table (Q-BRIDGE-MIB with VLAN, else BRIDGE-MIB).
+
+Phoedox turns these into entries: the device becomes a switch or router. LLDP neighbours and MAC addresses known in the project become `wired_to` relations with the port.
+
+Cisco devices keep the MAC table per VLAN behind `community@vlan`; that is not read yet.
+
 ## License
 
 MIT – see [LICENSE](LICENSE).

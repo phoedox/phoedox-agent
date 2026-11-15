@@ -13,6 +13,8 @@ import (
 	"path"
 	"regexp"
 	"time"
+
+	"github.com/phoedox/phoedox-agent/internal/snmp"
 )
 
 // Action names.
@@ -57,6 +59,8 @@ type Config struct {
 	// HomeAssistant connects a Home Assistant in this network: the agent
 	// reads devices and states and, with ha.call allowed, switches entities.
 	HomeAssistant HomeAssistant `json:"homeassistant" yaml:"homeassistant"`
+	// SNMP lists switches and routers the agent polls (read only).
+	SNMP snmp.Config `json:"snmp" yaml:"snmp"`
 }
 
 // HomeAssistant is the homeassistant section of agent.yaml. The token

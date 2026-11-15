@@ -26,6 +26,7 @@ import (
 	"github.com/phoedox/phoedox-agent/internal/homeassistant"
 	"github.com/phoedox/phoedox-agent/internal/jobs"
 	"github.com/phoedox/phoedox-agent/internal/policy"
+	"github.com/phoedox/phoedox-agent/internal/snmp"
 	"github.com/phoedox/phoedox-agent/internal/speedtest"
 	"github.com/phoedox/phoedox-agent/internal/state"
 	"github.com/phoedox/phoedox-agent/internal/terminal"
@@ -84,12 +85,18 @@ func main() {
 // ha is the Home Assistant in this network, if agent.yaml names one.
 var ha *homeassistant.Client
 
+// poller polls the SNMP targets of agent.yaml.
+var poller *snmp.Poller
+
 // snapshot reads the host; Docker and Home Assistant are optional.
 func snapshot(ctx context.Context) collect.Snapshot {
 	s := collect.Take()
 	s.Version = version
 	if ha != nil {
 		s.HomeAssistant = ha.Read(ctx, time.Now())
+	}
+	if poller != nil {
+		s.SNMP = poller.Read(ctx, time.Now())
 	}
 	if cs, err := docker.Containers(ctx, docker.Socket()); err == nil {
 		s.Containers = cs
@@ -150,6 +157,10 @@ func run(ctx context.Context, args []string) error {
 	if cfg.HomeAssistant.Enabled() {
 		ha = &homeassistant.Client{URL: cfg.HomeAssistant.URL, TokenFile: cfg.HomeAssistant.TokenFile}
 		log.Printf("reading Home Assistant at %s", cfg.HomeAssistant.URL)
+	}
+	if len(cfg.SNMP.Targets) > 0 {
+		poller = &snmp.Poller{Config: cfg.SNMP}
+		log.Printf("polling %d device(s) over SNMP", len(cfg.SNMP.Targets))
 	}
 	log.Printf("reporting to %s (project %s) every %s", st.Instance, st.Project, *interval)
 	if len(cfg.Allow) > 0 && len(cfg.AdminKeys) > 0 {
