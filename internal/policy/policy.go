@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/phoedox/phoedox-agent/internal/discovery"
 	"github.com/phoedox/phoedox-agent/internal/snmp"
 )
 
@@ -61,6 +62,8 @@ type Config struct {
 	HomeAssistant HomeAssistant `json:"homeassistant" yaml:"homeassistant"`
 	// SNMP lists switches and routers the agent polls (read only).
 	SNMP snmp.Config `json:"snmp" yaml:"snmp"`
+	// Discovery reads the neighbour table and mDNS announcements (off by default).
+	Discovery discovery.Config `json:"discovery" yaml:"discovery"`
 }
 
 // HomeAssistant is the homeassistant section of agent.yaml. The token

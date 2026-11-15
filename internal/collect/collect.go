@@ -3,6 +3,7 @@
 package collect
 
 import (
+	"github.com/phoedox/phoedox-agent/internal/discovery"
 	"github.com/phoedox/phoedox-agent/internal/homeassistant"
 	"github.com/phoedox/phoedox-agent/internal/snmp"
 
@@ -45,6 +46,8 @@ type Snapshot struct {
 	// SNMP is what the agent polled from switches and routers (snmp in
 	// agent.yaml); sent only after a poll.
 	SNMP []snmp.Device `json:"snmp,omitempty"`
+	// Discovered are devices seen in the network (discovery in agent.yaml).
+	Discovered []discovery.Device `json:"discovered,omitempty"`
 }
 
 // Container is a Docker container on the host.

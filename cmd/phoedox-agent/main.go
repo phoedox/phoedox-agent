@@ -22,6 +22,7 @@ import (
 	"github.com/phoedox/phoedox-agent/internal/client"
 	"github.com/phoedox/phoedox-agent/internal/collect"
 	"github.com/phoedox/phoedox-agent/internal/config"
+	"github.com/phoedox/phoedox-agent/internal/discovery"
 	"github.com/phoedox/phoedox-agent/internal/docker"
 	"github.com/phoedox/phoedox-agent/internal/homeassistant"
 	"github.com/phoedox/phoedox-agent/internal/jobs"
@@ -88,6 +89,9 @@ var ha *homeassistant.Client
 // poller polls the SNMP targets of agent.yaml.
 var poller *snmp.Poller
 
+// finder discovers devices in the network when agent.yaml allows it.
+var finder *discovery.Finder
+
 // snapshot reads the host; Docker and Home Assistant are optional.
 func snapshot(ctx context.Context) collect.Snapshot {
 	s := collect.Take()
@@ -97,6 +101,9 @@ func snapshot(ctx context.Context) collect.Snapshot {
 	}
 	if poller != nil {
 		s.SNMP = poller.Read(ctx, time.Now())
+	}
+	if finder != nil {
+		s.Discovered = finder.Read(ctx, time.Now())
 	}
 	if cs, err := docker.Containers(ctx, docker.Socket()); err == nil {
 		s.Containers = cs
@@ -161,6 +168,10 @@ func run(ctx context.Context, args []string) error {
 	if len(cfg.SNMP.Targets) > 0 {
 		poller = &snmp.Poller{Config: cfg.SNMP}
 		log.Printf("polling %d device(s) over SNMP", len(cfg.SNMP.Targets))
+	}
+	if cfg.Discovery.Enabled {
+		finder = &discovery.Finder{Config: cfg.Discovery}
+		log.Printf("network discovery is on (neighbour table, mDNS)")
 	}
 	log.Printf("reporting to %s (project %s) every %s", st.Instance, st.Project, *interval)
 	if len(cfg.Allow) > 0 && len(cfg.AdminKeys) > 0 {

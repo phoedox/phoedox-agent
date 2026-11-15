@@ -136,6 +136,21 @@ Phoedox turns these into entries: the device becomes a switch or router. LLDP ne
 
 Cisco devices keep the MAC table per VLAN behind `community@vlan`; that is not read yet.
 
+## Network discovery
+
+Off by default. When it is on, the agent finds devices in its network without scanning:
+- it reads the host's neighbour table (`/proc/net/arp`, Linux);
+- it asks once per round over mDNS which services announce themselves (DNS-SD, e.g. printers, NAS, Home Assistant, Chromecast).
+
+```yaml
+discovery:
+  enabled: true
+  mdns: true          # default true when enabled
+  everyMinutes: 30    # default 30
+```
+
+Phoedox lists what it finds under Knowledge graph → Discovered, where people add devices as entries or ignore them. Organizations can forbid discovery for all their projects; the instance then drops these results.
+
 ## License
 
 MIT – see [LICENSE](LICENSE).
