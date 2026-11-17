@@ -22,6 +22,7 @@ import (
 	"github.com/phoedox/phoedox-agent/internal/client"
 	"github.com/phoedox/phoedox-agent/internal/collect"
 	"github.com/phoedox/phoedox-agent/internal/config"
+	"github.com/phoedox/phoedox-agent/internal/conn"
 	"github.com/phoedox/phoedox-agent/internal/discovery"
 	"github.com/phoedox/phoedox-agent/internal/docker"
 	"github.com/phoedox/phoedox-agent/internal/homeassistant"
@@ -269,18 +270,27 @@ func jobLoop(ctx context.Context, c *client.Client, st state.State, cfg policy.C
 	if ha != nil {
 		runner.HACall = ha.Call
 	}
+	mode := conn.Auto
+	switch cfg.Transport {
+	case "websocket":
+		mode = conn.WS
+	case "poll":
+		mode = conn.Poll
+	}
+	src := &conn.Source{Client: c, Mode: mode}
+	defer src.Close()
 	slots := make(chan struct{}, maxSessions)
 	report := func(id string, res jobs.Result) {
 		// The result is reported even while the agent stops.
 		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		defer cancel()
-		if err := c.Result(rctx, id, res.OK, res.Output); err != nil {
+		if err := src.Result(rctx, id, res.OK, res.Output); err != nil {
 			log.Printf("job %s: report result: %v", id, err)
 		}
 	}
 	dir := state.Dir()
 	for ctx.Err() == nil {
-		list, err := c.Jobs(ctx, 25*time.Second)
+		list, err := src.Jobs(ctx)
 		if errors.Is(err, client.ErrRevoked) {
 			return
 		}

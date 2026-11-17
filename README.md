@@ -54,7 +54,21 @@ Every action needs three things:
    sign jobs.
 
 Jobs expire after 10 minutes and are run only once (`jobs-done.json`).
-The agent fetches them via long poll over HTTPS; connections stay outgoing only.
+
+### Connection (ADR-0037)
+
+The agent keeps one outgoing WebSocket to `/api/v1/agent/ws`: jobs arrive at once and
+results go back on the same connection. If the WebSocket drops, it reconnects with
+backoff (1 s up to 1 min). If the upgrade fails – for example behind a proxy without
+WebSocket support – it falls back to HTTPS long-poll (`/api/v1/agent/jobs`) and tries
+the WebSocket again after ten minutes. A rejected token stops the job loop on both.
+Set `transport: poll` (or `websocket`) in `agent.yaml` to force one transport.
+Connections stay outgoing only; signatures and `policy.Check` work the same on both.
+
+Hardening: if your instance sits behind a reverse proxy that can require client
+certificates (mTLS), you can additionally restrict `/api/v1/agent/` to agents with a
+certificate; the agent itself needs no change for that as long as the proxy, not the
+agent, terminates TLS towards the instance.
 
 ### Wake-on-LAN, speed test and terminal
 

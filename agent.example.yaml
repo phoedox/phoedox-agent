@@ -20,6 +20,8 @@ execCommands: []
 adminKeys: []
 # Shell for "terminal" (absolute path); default /bin/bash, else /bin/sh
 # terminalShell: /bin/bash
+# Job transport: auto (WebSocket, HTTPS long-poll as fallback), websocket or poll.
+# transport: auto
 # Mode: host | proxmox-host | docker
 mode: host
 # Network discovery (ARP, mDNS, SNMP, LLDP); organisations can force this off

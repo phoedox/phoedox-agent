@@ -52,6 +52,11 @@ func Load(dir string) (policy.Config, error) {
 	if c.TerminalShell != "" && (!filepath.IsAbs(c.TerminalShell) || filepath.Clean(c.TerminalShell) != c.TerminalShell) {
 		return c, fmt.Errorf("%s: terminalShell must be an absolute path", File)
 	}
+	switch c.Transport {
+	case "", "auto", "websocket", "poll":
+	default:
+		return c, fmt.Errorf("%s: transport must be auto, websocket or poll", File)
+	}
 	if h := c.HomeAssistant; h.URL != "" || h.TokenFile != "" {
 		if u, err := url.Parse(h.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return c, fmt.Errorf("%s: homeassistant.url must be http(s)://host:port", File)

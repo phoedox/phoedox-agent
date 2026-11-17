@@ -7,7 +7,8 @@ Agent für Server/VMs/LXC. Gesamtentscheidungen: in Phoedox (https://app.phoedox
 - `cmd/phoedox-agent` – CLI (`collect`, `enroll`, `run`, `version`)
 - `internal/collect` – Lesen; plattformspezifisch per Build-Tags (`collect_linux.go`, weitere folgen)
 - `internal/policy` – Sicherheitsprüfung für Aktionen: lokale Allowlist + ablaufender, ed25519-signierter Auftrag
-- Geplant: `internal/conn` (WebSocket + mTLS, Wiederverbinden), `internal/docker`, `internal/proxmox`, `internal/pkg` (apt/dnf/…), `internal/discovery` (abschaltbar), `internal/update` (signiertes Selbst-Update)
+- `internal/conn` – Jobs über WebSocket (Push, Ergebnisse zurück), Wiederverbinden mit Backoff, Fallback auf HTTPS-Long-Poll (ADR-0037)
+- Geplant: `internal/docker`, `internal/proxmox`, `internal/pkg` (apt/dnf/…), `internal/discovery` (abschaltbar), `internal/update` (signiertes Selbst-Update)
 
 ## Regeln
 

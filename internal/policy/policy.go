@@ -57,6 +57,9 @@ type Config struct {
 	// TerminalShell is the absolute path of the shell for the terminal
 	// action; empty means /bin/bash if it exists, else /bin/sh.
 	TerminalShell string `json:"terminalShell,omitempty" yaml:"terminalShell"`
+	// Transport for jobs: auto (WebSocket, HTTPS long-poll as fallback,
+	// default), websocket or poll (ADR-0037).
+	Transport string `json:"transport,omitempty" yaml:"transport"`
 	// HomeAssistant connects a Home Assistant in this network: the agent
 	// reads devices and states and, with ha.call allowed, switches entities.
 	HomeAssistant HomeAssistant `json:"homeassistant" yaml:"homeassistant"`
